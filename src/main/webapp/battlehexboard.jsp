@@ -19,6 +19,8 @@
 	boardHelper.setBoardColumns(13);
 	boardHelper.setPlayer(BoardHelper.FIRST_PLAYER);
 	boardHelper.setBoardShape(BoardHelper.VERTICAL_BOARD);
+
+	String[] indexValues = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
 %>
 
 <c:set var="player"><%= boardHelper.getPlayer() %></c:set>
@@ -217,7 +219,8 @@
 				drawHexPiece(playerBoardRow, playerBoardColumn, "cyan");
 			}
 		}
-		
+
+/*
 		var svgTextLabel = function(x, y, text, fill) {
 			
 			var textObj = document.createElementNS(svgNS, "text");
@@ -235,6 +238,7 @@
 			
 			return textObj;
 		}
+*/
 		
 		var svgHexCell = function(row, column) {
 		
@@ -278,6 +282,7 @@
 			return pieceObj;
 		}
 		
+/*
 		var drawSVGBoard = function() {
 			
 			var svgObj = document.getElementById(svgID);
@@ -298,6 +303,7 @@
 				svgObj.appendChild(svgTextLabel(getXCoord(0, columnIndex), getYCoord(0, columnIndex), "B"+indexValues[columnIndex-1].toUpperCase(), "white"));
 			}
 		}
+*/
 		
 		var drawSVGPiece = function(row, column, color) {
 			var svgObj = document.getElementById(svgID);
@@ -478,7 +484,7 @@
 	</script>
   </head>
 
-  <body onload="drawSVGBoard(); drawJSGBoard();">
+  <body onload="drawJSGBoard();">
   	<table align="center" style="background-color: #004400;">
   		<tr>
   			<td>
@@ -518,6 +524,68 @@
 								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns())+boardHelper.getAcuteBorderLength() %>
 								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1)-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>"
 							style="fill: black; stroke: black;" />
+
+<%
+	for (int i=1; i <= indexValues.length; i++) {
+%>
+						<text
+							x="<%= boardHelper.getCellXCoord(i, 0) %>"
+							y="<%= boardHelper.getCellYCoord(i, 0) %>"
+							text-anchor="middle"
+							dominant-baseline="middle"
+							fill="black"
+							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= indexValues[i-1] %></text>
+						<text
+							x="<%= boardHelper.getCellXCoord(i, 14) %>"
+							y="<%= boardHelper.getCellYCoord(i, 14) %>"
+							text-anchor="middle"
+							dominant-baseline="middle"
+							fill="black"
+							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= indexValues[i-1] %></text>
+<%
+	}
+%>
+
+<%
+	for (int i=1; i <= indexValues.length; i++) {
+%>
+						<text
+							x="<%= boardHelper.getCellXCoord(0, i) %>"
+							y="<%= boardHelper.getCellYCoord(0, i) %>"
+							text-anchor="middle"
+							dominant-baseline="middle"
+							fill="white"
+							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= indexValues[i-1] %></text>
+						<text
+							x="<%= boardHelper.getCellXCoord(14, i) %>"
+							y="<%= boardHelper.getCellYCoord(14, i) %>"
+							text-anchor="middle"
+							dominant-baseline="middle"
+							fill="white"
+							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= indexValues[i-1] %></text>
+<%
+	}
+%>
+
+<%
+	for (int i=1; i <= boardHelper.getBoardRows(); i++) {
+		for (int j=1; j <= boardHelper.getBoardColumns(); j++) {
+%>
+						<polygon
+							points="
+<%
+			for (int k=0; k < 6; k++) {
+%>
+								<%= boardHelper.getPointXCoord(boardHelper.getCellXCoord(i, j), k) %>,<%= boardHelper.getPointYCoord(boardHelper.getCellYCoord(i, j), k) %>
+<%
+			}
+%>							"
+							onclick="makeCellMove(<%= i %>,<%= j %>);"
+							style="fill: white; stroke: black;" />
+<%
+		}
+	}
+%>
 				</svg>
   			</td>
   			<td style="text-align: center;">
