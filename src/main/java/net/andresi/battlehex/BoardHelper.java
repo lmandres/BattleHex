@@ -1,6 +1,7 @@
 package battlehex;
 
 import java.lang.Math;
+import org.apache.commons.lang3.ArrayUtils;
 
 public class BoardHelper {
 	
@@ -33,9 +34,9 @@ public class BoardHelper {
 	public void setPlayer(int playerIn) {
 		
 		if ((playerIn & 0x0003) > 0) {
-			boardShape |= playerIn;
+			boardShape = (boardShape & 0xfffc) | (playerIn & 0x0003);
 		} else {
-			boardShape |= FIRST_PLAYER;
+			boardShape = (boardShape & 0xfffc) | (FIRST_PLAYER & 0x0003);
 		}
 		
 		setBoardVars();
@@ -49,9 +50,9 @@ public class BoardHelper {
 	public void setBoardShape(int bShapeIn) {
 		
 		if ((bShapeIn & 0x001c) > 0) {
-			boardShape |= bShapeIn;
+			boardShape = (boardShape & 0xffe3) | (bShapeIn & 0x001c);
 		} else {
-			boardShape |= VERTICAL_BOARD;
+			boardShape = (boardShape & 0xffe3) | (VERTICAL_BOARD & 0x001c);
 		}
 		
 		setBoardVars();
@@ -122,6 +123,7 @@ public class BoardHelper {
 			switch (boardShape) {
 			
 			case VERTICAL_BOARD+FIRST_PLAYER:
+			case VERTICAL_BOARD+SECOND_PLAYER:
 				cellYRadius = ((double)imageHeight/(2+((((double)boardRows-1)+((double)boardColumns-1)+3)*(1+Math.sin(Math.PI/6)))+(2/Math.sin(Math.PI/6))));
 				cellRadius = ((double)imageWidth/((((double)boardColumns+1)*Math.sin(Math.PI/3))+(((double)boardRows-1)*Math.sin(2*Math.PI/3))+(2/Math.sin(Math.PI/3))+(2*Math.cos(Math.PI/6))));
 				break;
@@ -153,8 +155,9 @@ public class BoardHelper {
 			switch (boardShape) {
 			
 			case VERTICAL_BOARD+FIRST_PLAYER:
+			case VERTICAL_BOARD+SECOND_PLAYER:
 				startXCoord = ((double)((double)imageWidth/2)-(((double)boardColumns-(double)boardRows)*getCellHalfWidth()/2));
-				startYCoord = ((double) (((double)imageHeight/2)-(((double)boardColumns-(double)boardRows)*getCellExtendedLength()/2))-(((double)boardRows-1)*getCellExtendedLength()));
+				startYCoord = ((double)(((double)imageHeight/2)-(((double)boardColumns-(double)boardRows)*getCellExtendedLength()/2))-(((double)boardRows-1)*getCellExtendedLength()));
 				break;
 			}
 		}
@@ -168,6 +171,66 @@ public class BoardHelper {
 		return startYCoord;
 	}
 	
+	public double getBorderObtuseXCoord() {
+		
+		double returnXCoord = 0;
+		
+		switch (boardShape) {
+		
+		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnXCoord = ((getBoardColumns()-1)*getCellHalfWidth());
+			break;
+		}
+		
+		return returnXCoord;
+	}
+	
+	public double getBorderObtuseYCoord() {
+		
+		double returnYCoord = 0;
+		
+		switch (boardShape) {
+		
+		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnYCoord = ((getBoardColumns()-1)*getCellExtendedLength());
+			break;
+		}
+		
+		return returnYCoord;
+	}
+	
+	public double getBorderAcuteXCoord() {
+		
+		double returnXCoord = 0;
+		
+		switch (boardShape) {
+		
+		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnXCoord = 0;
+			break;
+		}
+		
+		return returnXCoord;
+	}
+	
+	public double getBorderAcuteYCoord() {
+		
+		double returnYCoord = 0;
+		
+		switch (boardShape) {
+		
+		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnYCoord = ((getBoardRows()-1)*(2*getCellExtendedLength()));
+			break;
+		}
+		
+		return returnYCoord;
+	}
+	
 	public double getCellXCoord(int rowIn, int columnIn) {
 		
 		double returnXCoord = 0;
@@ -176,6 +239,9 @@ public class BoardHelper {
 		
 		case VERTICAL_BOARD+FIRST_PLAYER:
 			returnXCoord = getStartXCoord()+((columnIn-rowIn)*getCellHalfWidth());
+			break;
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnXCoord = getStartXCoord()+(((getBoardColumns()-columnIn+1)-(getBoardRows()-rowIn+1))*getCellHalfWidth());
 			break;
 		}
 		
@@ -191,6 +257,9 @@ public class BoardHelper {
 		case VERTICAL_BOARD+FIRST_PLAYER:
 			returnYCoord = getStartYCoord()+((columnIn-rowIn)*getCellExtendedLength())+((rowIn-1)*(2*getCellExtendedLength()));
 			break;
+		case VERTICAL_BOARD+SECOND_PLAYER:
+			returnYCoord = getStartYCoord()+(((getBoardColumns()-columnIn+1)-(getBoardRows()-rowIn+1))*getCellExtendedLength())+(((getBoardRows()-rowIn))*(2*getCellExtendedLength()));
+			break;
 		}
 		
 		return returnYCoord;
@@ -203,6 +272,7 @@ public class BoardHelper {
 		switch (boardShape) {
 		
 		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
 			returnXCoord = cellXCoordIn+(getCellRadius()*Math.cos((pointIndexIn*Math.PI/3)+Math.PI/6));
 			break;
 		}
@@ -217,6 +287,7 @@ public class BoardHelper {
 		switch (boardShape) {
 		
 		case VERTICAL_BOARD+FIRST_PLAYER:
+		case VERTICAL_BOARD+SECOND_PLAYER:
 			returnYCoord = cellYCoordIn+(getCellRadius()*Math.sin((pointIndexIn*Math.PI/3)+Math.PI/6));
 			break;
 		}
@@ -246,5 +317,23 @@ public class BoardHelper {
 	
 	public double getObtuseBorderLength() {
 		return (cellRadius/Math.sin(Math.PI/3))+(2*(cellRadius*(Math.cos(Math.PI/6))));
+	}
+
+	public String getBoardLabel(int intRowColumnIn) {
+		String[] indexValues = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+		return indexValues[intRowColumnIn-1];
+	}
+
+	public String getPlayerSuits() {
+
+		String returnSuits = "";
+
+		if (getPlayer() == FIRST_PLAYER) {
+			returnSuits = "s,d";
+		} else if (getPlayer() == SECOND_PLAYER) {
+			returnSuits = "c,h";
+		}
+
+		return returnSuits;
 	}
 }

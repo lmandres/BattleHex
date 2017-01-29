@@ -1,7 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=ISO-8859-1" pageEncoding="ISO-8859-1" %>
 <%@ page import="battlehex.BoardHelper" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <!-- The HTML 4.01 Transitional DOCTYPE declaration-->
 <!-- above set at the top of the file will set     -->
@@ -17,29 +15,25 @@
 	boardHelper.setImageHeight(550);
 	boardHelper.setBoardRows(13);
 	boardHelper.setBoardColumns(13);
-	boardHelper.setPlayer(BoardHelper.FIRST_PLAYER);
+	boardHelper.setPlayer(BoardHelper.SECOND_PLAYER);
 	boardHelper.setBoardShape(BoardHelper.VERTICAL_BOARD);
 
-	String[] indexValues = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+	String cardSet = "cardstux";
+	String [][] ranks = {{"a","2","3","4"},{"5","6","7","8"},{"9","10","j","q"},{"k"}};
+	String [] suits = boardHelper.getPlayerSuits().split(",");
 %>
-
-<c:set var="player"><%= boardHelper.getPlayer() %></c:set>
-<c:set var="cardSet" value="cardstux" />
-  				
-<c:if test="${player == 1}">
-	<c:set var="suits" value="s,d" />
-</c:if>
-<c:if test="${player == 2}">
-	<c:set var="suits" value="c,h" />
-</c:if>
 
 <html>
   <head>
     <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-    <title>Hello SVG!</title>
+    <title>Battle Hex</title>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"/>
+    <link rel="shortcut icon" href="/favicon.ico">
     <script type="text/javascript" src="wz_jsgraphics.js"></script>
 	<script type="text/javascript">
 	
+		var testVar = <%= boardHelper.getPlayer() %>;
+
 		var svgNS = "http://www.w3.org/2000/svg";
 		var svgID = "svgBoard";
 		
@@ -59,17 +53,37 @@
 		}
 		
 		var getXCoord = function(row, column) {
+<%
+	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
+%>
 			return <%= boardHelper.getStartXCoord() %>+((column-row)*<%= boardHelper.getCellHalfWidth() %>);
+<%
+	} else if (boardHelper.getPlayer() == BoardHelper.SECOND_PLAYER) {
+%>
+			return <%= boardHelper.getStartXCoord() %>+(((<%= boardHelper.getBoardColumns()+1 %>-column)-(<%= boardHelper.getBoardRows()+1 %>-row))*<%= boardHelper.getCellHalfWidth() %>);
+<%
+	}
+%>
 		}
 		
 		var getYCoord = function(row, column) {
+<%
+	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
+%>
 			return <%= boardHelper.getStartYCoord() %>+((column-row)*<%= boardHelper.getCellExtendedLength() %>)+((row-1)*<%= 2*boardHelper.getCellExtendedLength() %>);
+<%
+	} else if (boardHelper.getPlayer() == BoardHelper.SECOND_PLAYER) {
+%>
+			return <%= boardHelper.getStartYCoord() %>+(((<%= boardHelper.getBoardColumns()+1 %>-column)-(<%= boardHelper.getBoardRows()+1 %>-row))*<%= boardHelper.getCellExtendedLength() %>)+(((<%= boardHelper.getBoardRows() %>-row))*<%= 2*boardHelper.getCellExtendedLength() %>);
+<%
+	}
+%>
 		}
 		
 		var makeMove = function(card) {
 			
 			if (
-					document.getElementById(card).src != "${cardSet}/back.png" &&
+					document.getElementById(card).src != "<%= cardSet %>/back.png" &&
 					(
 						playerFlipCard == null ||
 						playerPlayCard != null ||
@@ -109,7 +123,7 @@
 		
 		var makeCellMove = function(row, column) {
 			
-			if (playerPlayCard == null) {
+			if ((playerPlayCard == null) && (playerFlipCard != null)) {
 				if (deleteLine.substr(0,1) == "r") {
 					makeMove("b"+indexValues[column-1]);
 				} else if (deleteLine.substr(0,1) == "c") {
@@ -154,11 +168,11 @@
 			if (playerPlayCard == null) {
 				
 				document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
-				document.getElementById("playerPlayCardImg").src = "${cardSet}/blank.png";
+				document.getElementById("playerPlayCardImg").src = "<%= cardSet %>/blank.png";
 				
 				for (cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
 					
-					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "${cardSet}/back.png";
+					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/back.png";
 					
 					if ((playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]) == playerFlipCard.toLowerCase()) {
 						if (("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase())) == 2) {
@@ -175,7 +189,7 @@
 				
 				for (cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
 					
-					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "${cardSet}/"+"${suits}".substr("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase()),1)+indexValues[cardIndex]+".png";
+					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/"+"<%= boardHelper.getPlayerSuits() %>".substr("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase()),1)+indexValues[cardIndex]+".png";
 					
 					if ((playerPlayCard.substr(0,1).toLowerCase()+indexValues[cardIndex]) == playerPlayCard.toLowerCase()) {
 						if (("b,r".indexOf(playerPlayCard.substr(0,1).toLowerCase())) == 2) {
@@ -185,8 +199,9 @@
 						}
 					}
 				}
-				
+
 				drawHexPiece(playerBoardRow, playerBoardColumn, "cyan");
+
 			}
 				
 			if (playerFlipCard != null && playerPlayCard == null) {
@@ -212,33 +227,12 @@
 					if (deleteLine.substr(0,1) == "r") {
 						drawHexCell(deleteLine.substr(1,deleteLine.length-1), lineIndex);
 					} else if (deleteLine.substr(0,1) == "c") {
-						drawHexCell(lineIndex,deleteLine.substr(1,deleteLine.length-1));
+						drawHexCell(lineIndex, deleteLine.substr(1,deleteLine.length-1));
 					}
 				}
-				
 				drawHexPiece(playerBoardRow, playerBoardColumn, "cyan");
 			}
 		}
-
-/*
-		var svgTextLabel = function(x, y, text, fill) {
-			
-			var textObj = document.createElementNS(svgNS, "text");
-			var textNode = document.createTextNode(text);
-			
-			textObj.setAttribute("x", x);
-			textObj.setAttribute("y", y);
-			textObj.setAttribute("text-anchor", "middle");
-			textObj.setAttribute("dominant-baseline", "middle");
-			
-			textObj.setAttribute("style", "font-size:9; font-family: verdana; font-weight: bold;");
-			textObj.style.fill = fill;
-			
-			textObj.appendChild(textNode);
-			
-			return textObj;
-		}
-*/
 		
 		var svgHexCell = function(row, column) {
 		
@@ -252,10 +246,10 @@
 				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
 					
 					if (pointIndex != 0) {
-						out.println("pointsStr += \" \"");
+						out.println("\t\t\tpointsStr += \" \"");
 					}
 					
-					out.print("pointsStr += (xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+"))+\",\"+");
+					out.print("\t\t\tpointsStr += (xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+"))+\",\"+");
 					out.println("(yCoord+("+String.format("%.15f", (-1)*boardHelper.getPointYDelta(pointIndex))+"));");
 				}
 			%>
@@ -282,29 +276,6 @@
 			return pieceObj;
 		}
 		
-/*
-		var drawSVGBoard = function() {
-			
-			var svgObj = document.getElementById(svgID);
-			
-			for (columnIndex = 1; columnIndex <= <%= boardHelper.getBoardColumns() %>; columnIndex++) {
-				for (rowIndex = 1; rowIndex <= <%= boardHelper.getBoardRows() %>; rowIndex++) {
-					drawSVGCell(rowIndex, columnIndex);
-				}
-			}
-
-			for (rowIndex = 1; rowIndex <= <%= boardHelper.getBoardRows() %>; rowIndex++) {
-				svgObj.appendChild(svgTextLabel(getXCoord(rowIndex, <%= boardHelper.getBoardColumns()+1 %>), getYCoord(rowIndex, <%= boardHelper.getBoardColumns()+1 %>), "R"+indexValues[rowIndex-1].toUpperCase(), "black"));
-				svgObj.appendChild(svgTextLabel(getXCoord(rowIndex, 0), getYCoord(rowIndex, 0), "R"+indexValues[rowIndex-1].toUpperCase(), "black"));
-			}
-			
-			for (columnIndex = 1; columnIndex <= <%= boardHelper.getBoardColumns() %>; columnIndex++) {
-				svgObj.appendChild(svgTextLabel(getXCoord(<%= boardHelper.getBoardRows()+1 %>, columnIndex), getYCoord(<%= boardHelper.getBoardRows()+1 %>, columnIndex), "B"+indexValues[columnIndex-1].toUpperCase(), "white"));
-				svgObj.appendChild(svgTextLabel(getXCoord(0, columnIndex), getYCoord(0, columnIndex), "B"+indexValues[columnIndex-1].toUpperCase(), "white"));
-			}
-		}
-*/
-		
 		var drawSVGPiece = function(row, column, color) {
 			var svgObj = document.getElementById(svgID);
 			svgObj.appendChild(svgHexPiece(row, column, color));
@@ -322,7 +293,7 @@
 			
 			<%
 				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
-					out.println("xCoordArray["+pointIndex+"] = xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+");");
+					out.println("\t\t\txCoordArray["+pointIndex+"] = xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+");");
 				}
 			%>
 		
@@ -336,7 +307,7 @@
 			
 			<%
 				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
-					out.println("yCoordArray["+pointIndex+"] = yCoord+("+String.format("%.15f", (-1)*boardHelper.getPointYDelta(pointIndex))+");");
+					out.println("\t\t\tyCoordArray["+pointIndex+"] = yCoord+("+String.format("%.15f", (-1)*boardHelper.getPointYDelta(pointIndex))+");");
 				}
 			%>
 		
@@ -498,35 +469,34 @@
 					style="background: #004400;">
 						<polygon
 							points="
-								<%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns())+boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns())+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>"
+								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord()+boardHelper.getAcuteBorderLength() %>
+								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord()+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
 							style="fill: red; stroke: black;" />
 						<polygon
 							points="
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>
-								<%= boardHelper.getCellXCoord(1, 1) %>,<%= boardHelper.getCellYCoord(1, 1) %>
-								<%= boardHelper.getCellXCoord(1, 1) %>,<%= boardHelper.getCellYCoord(1, 1)-boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1)-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>"
+								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()-boardHelper.getAcuteBorderLength() %>
+								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord()-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
 							style="fill: red; stroke: black;" />
 						<polygon
 							points="
-								<%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>
-								<%= boardHelper.getCellXCoord(1, 1) %>,<%= boardHelper.getCellYCoord(1, 1) %>
-								<%= boardHelper.getCellXCoord(1, 1) %>,<%= boardHelper.getCellYCoord(1, 1)-boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns())+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>"
+								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()-boardHelper.getAcuteBorderLength() %>
+								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord()+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
 							style="fill: black; stroke: black;" />
 						<polygon
 							points="
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns())+boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1)-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>"
+								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord() %>
+								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord()+boardHelper.getAcuteBorderLength() %>
+								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord()-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
 							style="fill: black; stroke: black;" />
-
 <%
-	for (int i=1; i <= indexValues.length; i++) {
+	for (int i=1; i <= boardHelper.getBoardRows(); i++) {
 %>
 						<text
 							x="<%= boardHelper.getCellXCoord(i, 0) %>"
@@ -534,20 +504,20 @@
 							text-anchor="middle"
 							dominant-baseline="middle"
 							fill="black"
-							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= indexValues[i-1] %></text>
+							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= boardHelper.getBoardLabel(i) %></text>
 						<text
 							x="<%= boardHelper.getCellXCoord(i, 14) %>"
 							y="<%= boardHelper.getCellYCoord(i, 14) %>"
 							text-anchor="middle"
 							dominant-baseline="middle"
 							fill="black"
-							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= indexValues[i-1] %></text>
+							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= boardHelper.getBoardLabel(i) %></text>
 <%
 	}
 %>
 
 <%
-	for (int i=1; i <= indexValues.length; i++) {
+	for (int i=1; i <= boardHelper.getBoardColumns(); i++) {
 %>
 						<text
 							x="<%= boardHelper.getCellXCoord(0, i) %>"
@@ -555,14 +525,14 @@
 							text-anchor="middle"
 							dominant-baseline="middle"
 							fill="white"
-							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= indexValues[i-1] %></text>
+							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= boardHelper.getBoardLabel(i) %></text>
 						<text
 							x="<%= boardHelper.getCellXCoord(14, i) %>"
 							y="<%= boardHelper.getCellYCoord(14, i) %>"
 							text-anchor="middle"
 							dominant-baseline="middle"
 							fill="white"
-							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= indexValues[i-1] %></text>
+							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= boardHelper.getBoardLabel(i) %></text>
 <%
 	}
 %>
@@ -579,9 +549,11 @@
 								<%= boardHelper.getPointXCoord(boardHelper.getCellXCoord(i, j), k) %>,<%= boardHelper.getPointYCoord(boardHelper.getCellYCoord(i, j), k) %>
 <%
 			}
-%>							"
+%>
+							"
 							onclick="makeCellMove(<%= i %>,<%= j %>);"
-							style="fill: white; stroke: black;" />
+							style="stroke: black; fill: white;"
+							/>
 <%
 		}
 	}
@@ -593,22 +565,20 @@
   				
   				<tr>
   					<td style="text-align: right;">
-		  				<c:if test="${player == 1}">Opposite</c:if>
-		  				<c:if test="${player == 2}">Same</c:if>
+		  				<% if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) { %>Opposite<% } else { %>Same<% } %>
 		  			</td>
 		  			<td colspan="2">
-						<img id="opponentFlipCardImg" src="${cardSet}/blank.png" width="54" height="72">
-						<img id="opponentPlayCardImg" src="${cardSet}/blank.png" width="54" height="72"><br />
+						<img id="opponentFlipCardImg" src="<%= cardSet %>/blank.png" width="54" height="72">
+						<img id="opponentPlayCardImg" src="<%= cardSet %>/blank.png" width="54" height="72"><br />
   			  		</td>
   			  		<td></td>
   			  	<tr>
   			  		<td style="text-align: right;">	
-		  				<c:if test="${player == 1}">Same</c:if>
-		  				<c:if test="${player == 2}">Opposite</c:if>
+		  				<% if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) { %>Same<% } else { %>Opposite<% } %>
 		  			</td>
 		  			<td colspan="2">
-						<img id="playerFlipCardImg" src="${cardSet}/blank.png" width="54" height="72">
-						<img id="playerPlayCardImg" src="${cardSet}/blank.png" width="54" height="72"><br />
+						<img id="playerFlipCardImg" src="<%= cardSet %>/blank.png" width="54" height="72">
+						<img id="playerPlayCardImg" src="<%= cardSet %>/blank.png" width="54" height="72"><br />
   					</td>
   					<td>
   						<input type="button" value="Send Move"><br />
@@ -618,29 +588,42 @@
 		  				<td colspan="2" style="text-align: center;">Black</td>
   						<td colspan="2" style="text-align: center;">Red</td>
   					</tr>
-  					
-	  				<c:forTokens items="a,2,3,4;5,6,7,8;9,10,j,q;k" delims=";" var="ranks">
 	  				
-	  					<tr>
-			  			<c:forTokens items="${suits}" delims="," var="suit">
-			  			
+<%
+	for (int i=0; i < ranks.length; i++) {
+%>
+						<tr>
+<%
+		for (int j=0; j < suits.length; j++) {
+%>
 			  				<td colspan="2" style="text-align: center;">
-	  						<c:forTokens items="${ranks}" delims="," var="rank">
-			  				
-				  				<c:if test="${suit == 's' || suit == 'c'}">
-				  					<c:set var="line" value="b" />
-				  				</c:if>
-				  				<c:if test="${suit == 'd' || suit == 'h'}">
-				  					<c:set var="line" value="r" />
-				  				</c:if>
+<%
+
+			String suit = suits[j];
+			String line = "";
+
+			if (suit.equals("c") || suit.equals("s")) {
+				line = "b";
+			} else if (suit.equals("d") || suit.equals("h")) {
+				line = "r";
+			}
+
+			for (int k=0; k < ranks[i].length; k++) {
+				String rank = ranks[i][k];
+%>
 		  				
-		  						<img id="${line}${rank}" src="${cardSet}/${suit}${rank}.png" width="54" height="72" onclick="makeMove('${fn:toLowerCase(line)}${fn:toLowerCase(rank)}');">
-		  						
-		  					</c:forTokens>
-		  					 </td>
-	  					</c:forTokens>
-	  					<tr>
-	  				</c:forTokens>
+		  						<img id="<%= line %><%= rank %>" src="<%= cardSet %>/<%= suit %><%= rank %>.png" width="54" height="72" onclick="makeMove('<%= line %><%= rank %>');">
+<%
+			}
+%>
+							</td>
+<%
+		}
+%>
+						</tr>
+<%
+	}
+%>
   				
   			</table>
   			</td>
@@ -657,7 +640,7 @@
   				</div>
   			</td>
   			<td>
-  				<!-- <input type="button" value="Draw Piece" onclick="drawSVGPiece(4, 9, 'red'); drawJSGPiece(8, 5, 'black');"> -->
+  				<input type="button" value="Draw Piece" onclick="drawJSGPiece(8, 5, 'black');">
   			</td>
   		<tr>
   	</table>
