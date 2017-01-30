@@ -118,6 +118,7 @@
 				}
 				
 				displayMove();
+				console.log(playerBoardRow + ", " + playerBoardColumn);
 			}
 		}
 		
