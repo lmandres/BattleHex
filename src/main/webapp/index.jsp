@@ -57,10 +57,12 @@
     }
 
     joinExistingGame = function() {
-      let existingGames = firebase.database().ref().child("games").orderByChild("player2UID").equalTo(null).on("value", function(snapshot) {
+      let existingGames = firebase.database().ref().child("games").orderByChild("player2UID").equalTo(null).orderByChild("player1UID").on("value", function(snapshot) {
         let snapshotVals = snapshot.val();
         Object.keys(snapshotVals).forEach(function(snapshotKey) {
-          console.log("key: ", snapshotKey, " val: ", snapshotVals[snapshotKey]);
+          if (user.uid != snapshotVals[snapshotKey]["player1UID"]) {
+            console.log("key: ", snapshotKey, " val: ", snapshotVals[snapshotKey]);
+          }
         });
       });
     }
