@@ -29,6 +29,7 @@
     <title>Battle Hex</title>
     <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"/>
     <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="manifest" href="/manifest.json">
     <script type="text/javascript" src="wz_jsgraphics.js"></script>
 	<script type="text/javascript">
 	

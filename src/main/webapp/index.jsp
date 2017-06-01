@@ -10,7 +10,10 @@
     <title>Battle Hex</title>
     <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"/>
     <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="manifest" href="/manifest.json">
   </head>
+  <script src="https://www.gstatic.com/firebasejs/3.9.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/3.9.0/firebase-messaging.js></script>
   <script type="text/javascript">
 
     var user = null;
@@ -18,55 +21,48 @@
     getUserID = function() {
 
       let provider = new firebase.auth.GoogleAuthProvider();
+      const messaging = firebase.messaging();
 
       firebase.auth().getRedirectResult().then(function(result) {
 
         if (result.user == null) {
           firebase.auth().signInWithRedirect(provider);
         }
-
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        let token = result.credential.accessToken;
+	
+        messaging.requestPermission()
+	.then(function() {
+	  messaging.getToken()
+          .then(function(currentToken) {
+	    if (currentToken) {
+	      // Do something with token
+	    } else {
+	      console.log("No Instance ID token available.  Please reload page.");
+	    }
+          });
+	  messaging.onTokenRefresh(function() {
+	    messaging.getToken()
+	    .then(function(refreshedToken) {
+	      if (refreshedToken) {
+	        console.log("Token refreshed.");
+	        // Do something with token
+	      } else {
+	        console.log("No Instance ID token available.  Please reload page.");
+	      }
+	    });
+	  });
+	  messaging.onMessage(function(payload) {
+	    console.log("Message received. ", payload);
+	  });
+	}).catch(function(err) {
+	  console.log("Unable to get permission to notify.", err);
+	fd});
         user = result.user;
 
       }).catch(function(error) {
         console.log("error: ", error);
       });
     }
-
-    createNewGame = function() {
-
-      let newGameData = {
-        "player1UID" : user.uid,
-        "player2UID" : null,
-        "startDate" : new Date.getTime()
-      };
-
-      // Get a key for a new Game.
-      let newGameKey = firebase.database().ref().child("games").push().key;
-
-      // Write the new post's data simultaneously in the posts list and the user's post list.
-      let updates = {};
-      updates['/games/' + newGameKey] = newGameData;
-      updates['/user-games/' + user.uid + '/' + newGameKey] = newGameData;
-
-      let updatePromise = firebase.database().ref().update(updates);
-      updatePromise.then(function() {
-        window.location.assign("/battlehexboard.jsp?gameKey=" + newGameKey);
-      });
-    }
-
-    joinExistingGame = function() {
-      let existingGames = firebase.database().ref().child("games").orderByChild("player2UID").equalTo(null).orderByChild("player1UID").on("value", function(snapshot) {
-        let snapshotVals = snapshot.val();
-        Object.keys(snapshotVals).forEach(function(snapshotKey) {
-          if (user.uid != snapshotVals[snapshotKey]["player1UID"]) {
-            console.log("key: ", snapshotKey, " val: ", snapshotVals[snapshotKey]);
-          }
-        });
-      });
-    }
-
+    
     signOut = function() {
       firebase.auth().signOut().then(function() {
         console.log("Sign-out successful.");
