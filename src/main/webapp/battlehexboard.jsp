@@ -15,7 +15,7 @@
 	boardHelper.setImageHeight(550);
 	boardHelper.setBoardRows(13);
 	boardHelper.setBoardColumns(13);
-	boardHelper.setPlayer(BoardHelper.SECOND_PLAYER);
+	boardHelper.setPlayer(BoardHelper.FIRST_PLAYER);
 	boardHelper.setBoardShape(BoardHelper.VERTICAL_BOARD);
 
 	String cardSet = "cardstux";
@@ -27,32 +27,41 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
     <title>Battle Hex</title>
-    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"/>
-    <link rel="shortcut icon" href="/favicon.ico">
-    <script type="text/javascript" src="wz_jsgraphics.js"></script>
+    <link type="text/css" rel="stylesheet" href="main.css" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <script type="text/javascript" src="numeric-1.2.6.min.js"></script>
 	<script type="text/javascript">
 	
-		var testVar = <%= boardHelper.getPlayer() %>;
+		let player = <%= boardHelper.getPlayer() %>;
+		let computer = (player % 2) + 1;
 
-		var svgNS = "http://www.w3.org/2000/svg";
-		var svgID = "svgBoard";
+		let svgNS = "http://www.w3.org/2000/svg";
+		let svgID = "svgBoard";
 		
-		var divID = "divBoard";
+		let indexValues = ["a", "2", "3", "4", "5", "6", "7", "8", "9", "10", "j", "q", "k"];
 		
-		var indexValues = ["a", "2", "3", "4", "5", "6", "7", "8", "9", "10", "j", "q", "k"];
+		let playerFlipCard = null;
+		let playerPlayCard = null;
+
+		let computerFlipCard = null;
+		let computerPlayCard = null;
+
+		let computerSuits = "<%= boardHelper.getOpponentSuits() %>".split(",");
+		let deleteLine = null;
+
+		let gameBoard = [];
+
+		let voltageBoardIndexes = [];
+
+		let testVoltage = 100;
+		let defenseFactor = 1.5;
+		let offenseRange = 1;
 		
-		var playerFlipCard = null;
-		var playerPlayCard = null;
-		
-		var playerBoardRow = null;
-		var playerBoardColumn = null;
-		var deleteLine = null;
-		
-		var supportsSVG = function () {
+		function supportsSVG() {
 			return !!document.createElementNS && !!document.createElementNS(svgNS, "svg").createSVGRect;
 		}
 		
-		var getXCoord = function(row, column) {
+		function getXCoord(row, column) {
 <%
 	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
 %>
@@ -66,7 +75,7 @@
 %>
 		}
 		
-		var getYCoord = function(row, column) {
+		function getYCoord(row, column) {
 <%
 	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
 %>
@@ -80,142 +89,504 @@
 %>
 		}
 		
-		var makeMove = function(card) {
+		function makeMove(card, playerIn) {
+
+			let gameBoardSet = true;
+
+			if (gameBoard.length != indexValues.length+2) {
+				gameBoardSet = false;
+			} else {
+				for (let rowIndex = 0; (rowIndex < indexValues.length+2) || !gameBoardSet; rowIndex++) {
+					if (gameBoard[rowIndex].length != indexValues.length+2) {
+						gameBoardSet = false;
+					}
+				}
+			}
+
+			if (gameBoardSet) {
+
+				if (playerIn == player) {
 			
-			if (
-					document.getElementById(card).src != "<%= cardSet %>/back.png" &&
-					(
-						playerFlipCard == null ||
-						playerPlayCard != null ||
+					if (
+						document.getElementById(card).src != "<%= cardSet %>/back.png" &&
 						(
-							playerPlayCard == null &&
-							card.substr(0,1).toLowerCase() != playerFlipCard.substr(0,1).toLowerCase()
+							playerFlipCard == null ||
+							playerPlayCard != null ||
+							(
+								playerPlayCard == null &&
+								card.substr(0,1).toLowerCase() != playerFlipCard.substr(0,1).toLowerCase()	
+							)
 						)
-					)
+					) {
+
+						if (playerFlipCard == null) {
+							playerFlipCard = card;
+						} else if (playerPlayCard == null) {
+
+							let playerMove = getPlayerRowColumn(playerFlipCard, card);
+
+							if (
+								playerMove["row"] &&
+								playerMove["column"] &&
+								gameBoard[playerMove["row"]][playerMove["column"]] == null
+							) {
+								playerPlayCard = card;
+							}
+			
+						} else {
+
+							let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
+
+							drawHexCell(playerMove["row"], playerMove["column"]);
+
+							playerFlipCard = card;
+							playerPlayCard = null;
+						}
+
+						displayMove();
+					}
+				
+					if (
+						playerFlipCard != null &&
+						playerPlayCard != null
+					) {
+						if (document.getElementById("randomizeFlipInput").checked) {
+
+							randomizeMove(player);
+				
+							document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
+							document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
+						}
+						document.getElementById("sendMove").disabled = false;
+					} else {
+						document.getElementById("sendMove").disabled = true;
+					}
+
+				} else {
+
+					if (computerFlipCard == null) {
+						computerFlipCard = card;
+					} else if (computerPlayCard == null) {
+						computerPlayCard = card;					
+					} else {
+						computerFlipCard = card;
+						computerPlayCard = null;
+					}
+				}
+					
+
+				if ((playerPlayCard != null) || (playerFlipCard != null)) {
+					document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/back.png";
+					document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/back.png";
+				}
+			}
+		}
+		
+		function makeCellMove(row, column, playerIn) {
+
+			if (playerIn == player) {
+				if ((playerPlayCard == null) && (playerFlipCard != null)) {
+					if (deleteLine.substr(0,1) == "r") {
+						makeMove("b"+indexValues[column-1], playerIn);
+					} else if (deleteLine.substr(0,1) == "c") {
+						makeMove("r"+indexValues[row-1], playerIn);
+					}
+				}
+
+				makeMove("r"+indexValues[row-1], playerIn);
+				makeMove("b"+indexValues[column-1], playerIn);
+
+			} else {
+
+				makeMove("r"+indexValues[row-1], playerIn);
+				makeMove("b"+indexValues[column-1], playerIn);
+
+				randomizeMove(computer);
+			}
+		}
+		
+		function randomizeMove(playerIn) {
+
+			if (playerIn == player) {
+
+				if (playerFlipCard != null && playerPlayCard != null) {
+					if (Math.random() < 0.5) {
+						var tempCard = playerFlipCard;
+						playerFlipCard = playerPlayCard;
+						playerPlayCard = tempCard;
+					}
+				
+					document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
+					document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
+				}
+
+			} else {
+				if (Math.random() < 0.5) {
+					var tempCard = computerFlipCard;
+					computerFlipCard = computerPlayCard;
+					computerPlayCard = tempCard;
+				}
+			}
+		}
+
+		function showMoves() {
+
+			if (
+				playerFlipCard != null &&
+				playerPlayCard != null &&
+				computerFlipCard != null &&
+				computerPlayCard != null
+			) {
+
+				let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
+
+				document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
+				document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
+
+				if (playerMove["row"] == computerMove["row"] && playerMove["column"] == computerMove["column"]) {
+					tieBreaker();
+				} else {
+
+					if (player == 1) {
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "red");
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "black");
+					} else {
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "black");
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "red");
+					}
+
+					playerFlipCard = null;
+					playerPlayCard = null;
+					computerFlipCard = null;
+					computerPlayCard = null;
+
+					computerMove = calculateComputerMove(computer);
+					makeCellMove(computerMove["row"], computerMove["column"], computer);
+					showMoves();
+				}
+
+			} else {
+
+				let playerCount = 0;
+				let computerCount = 0;
+
+				for (let rowIndex = 1; rowIndex <= indexValues.length; rowIndex++) {
+					for (let columnIndex = 1; columnIndex <= indexValues.length; columnIndex++) {
+						if (gameBoard[rowIndex][columnIndex] == player) {
+							playerCount++;
+						} else if (gameBoard[rowIndex][columnIndex] == computer) {
+							computerCount++;
+						}
+					}
+				}
+
+				if (
+					(playerCount < computerCount) &&
+					playerFlipCard != null &&
+					playerPlayCard != null
 				) {
 
-				if (playerFlipCard == null) {
-					
-					playerFlipCard = card;
-					
-				} else if (playerPlayCard == null) {
-					
-					playerPlayCard = card;
-					document.getElementById("randomizeFlipInput").disabled = false;
-					document.getElementById("randomizeFlipInput").checked = false;
+					let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
+
+					if (computerFlipCard.substr(0, 1) == "r") {
+						makeMove("r" + indexValues[playerMove["row"]-1], player);
+						makeMove("b" + indexValues[playerMove["column"]-1], player);
+					} else {
+						makeMove("b" + indexValues[playerMove["column"]-1], player);
+						makeMove("r" + indexValues[playerMove["row"]-1], player);
+					}
+
+					if (player == 1) {
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "red");
+					} else {
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "black");
+					}
+
+					playerFlipCard = null;
+					playerPlayCard = null;
+					computerFlipCard = null;
+					computerPlayCard = null;
+
+					computerMove = calculateComputerMove(computer);
+					makeCellMove(computerMove["row"], computerMove["column"], computer);
+					showMoves();
+				}
+			}
+
+			if (evaluateWin(0, 0, 0, player)) {
+				alert("Player wins!");
+			} else if (evaluateWin(0, 0, 0, computer)) {
+				alert("Computer wins!");
+			}
+		}
+
+		function tieBreaker() {
+
+			if (
+				playerFlipCard != null &&
+				playerPlayCard != null &&
+				computerFlipCard != null &&
+				computerPlayCard != null
+			) {
+
+				let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
+
+				if (playerFlipCard == computerFlipCard) {
+
+					if (player == 1) {
+
+						computerMove = {};
+
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "red");
+
+						computerMove = calculateComputerMove(computer);
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "black");
+
+						if (playerFlipCard.substr(0, 1) == "r") {
+							makeMove("r" + indexValues[computerMove["row"]-1], computer);
+							makeMove("b" + indexValues[computerMove["column"]-1], computer);
+						} else {
+							makeMove("b" + indexValues[computerMove["column"]-1], computer);
+							makeMove("r" + indexValues[computerMove["row"]-1], computer);
+						}
+
+						playerFlipCard = null;
+						playerPlayCard = null;
+
+						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
+						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
+
+						computerMove = calculateComputerMove(computer);
+						makeCellMove(computerMove["row"], computerMove["column"], computer);
+
+					} else {
+
+						playerFlipCard = null;
+						playerPlayCard = null;
+
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "red");
+					}
 					
 				} else {
-					
-					playerFlipCard = card;
-					playerPlayCard = null;
-					
-					drawHexCell(playerBoardRow, playerBoardColumn);
-					document.getElementById("randomizeFlipInput").disabled = true;
-					document.getElementById("randomizeFlipInput").checked = false;
-					
-					playerBoardRow = null;
-					playerBoardColumn = null;
+
+					if (player == 2) {
+
+						computerMove = {};
+
+						gameBoard[playerMove["row"]][playerMove["column"]] = player;
+						drawHexPiece(playerMove["row"], playerMove["column"], "black");
+
+						computerMove = calculateComputerMove(computer);
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "red");
+
+						if (playerFlipCard.substr(0, 1) == "r") {
+							makeMove("r" + indexValues[computerMove["row"]-1], computer);
+							makeMove("b" + indexValues[computerMove["column"]-1], computer);
+						} else {
+							makeMove("b" + indexValues[computerMove["column"]-1], computer);
+							makeMove("r" + indexValues[computerMove["row"]-1], computer);
+						}
+
+						playerFlipCard = null;
+						playerPlayCard = null;
+
+						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
+						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
+
+						computerMove = calculateComputerMove(computer);
+						makeCellMove(computerMove["row"], computerMove["column"], computer)
+;
+					} else {
+
+						playerFlipCard = null;
+						playerPlayCard = null;
+
+						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
+						drawHexPiece(computerMove["row"], computerMove["column"], "black");
+					}
 				}
-				
-				displayMove();
-				console.log(playerBoardRow + ", " + playerBoardColumn);
 			}
 		}
-		
-		var makeCellMove = function(row, column) {
-			
-			if ((playerPlayCard == null) && (playerFlipCard != null)) {
-				if (deleteLine.substr(0,1) == "r") {
-					makeMove("b"+indexValues[column-1]);
-				} else if (deleteLine.substr(0,1) == "c") {
-					makeMove("r"+indexValues[row-1]);
+
+		function evaluateWin(rowIndexIn, columnIndexIn, stepIn, playerIn) {
+
+			let playerSign = 1;
+			let nextStep = stepIn;
+
+			if (nextStep == 0) {
+				if (columnIndexIn+playerSign <= indexValues.length+1) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+playerSign, gameBoard, playerIn) == 2) {
+						if (columnIndexIn+playerSign >= indexValues.length+1 && playerIn == 1) {
+							return true;
+						} else if (columnIndexIn+playerSign >= indexValues.length+1 && 0 <= rowIndexIn && playerIn == 2) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn, columnIndexIn+playerSign, 4, playerIn);
+						}
+					}
 				}
+				nextStep = 1;
 			}
-			
-			makeMove("r"+indexValues[row-1]);
-			makeMove("b"+indexValues[column-1]);
-			
-			randomizeMove();
+				
+			if (nextStep == 1) {
+				if (rowIndexIn+playerSign <= indexValues.length+1) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+playerSign, columnIndexIn, gameBoard, playerIn) == 2) {
+						if (rowIndexIn+playerSign >= indexValues.length+1 && playerIn == 2) {
+							return true;
+						} else if (rowIndexIn+playerSign >= indexValues.length+1 && 0 <= columnIndexIn && playerIn == 1) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn+playerSign, columnIndexIn, 5, playerIn);
+						}
+					}
+				}
+				nextStep = 2;
+			}
+
+			if (stepIn == 2) {
+				if (0 <= columnIndexIn-playerSign && rowIndexIn+playerSign <= indexValues.length+1) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+playerSign, columnIndexIn-playerSign, gameBoard, playerIn) == 2) {
+						if (rowIndexIn+playerSign >= indexValues.length+1 && playerIn == 2) {
+							return true;
+						} else if (columnIndexIn-playerSign <= 0 && rowIndexIn+playerSign >= indexValues.length+1 && playerIn == 2) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn+playerSign, columnIndexIn-playerSign, 0, playerIn);
+						}
+					}
+				}
+				nextStep = 3;
+			}
+
+			if (nextStep == 3) {
+				if (0 <= columnIndexIn-playerSign) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-playerSign, gameBoard, playerIn) == 2) {
+						if (columnIndexIn-playerSign <= 0 && rowIndexIn >= 14 && playerIn == 1) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn, columnIndexIn-playerSign, 1, playerIn);
+						}
+					}
+				}
+				nextStep = 4;
+			}
+
+			if (nextStep == 4) {
+				if (0 <= rowIndexIn-playerSign) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-playerSign, columnIndexIn, gameBoard, playerIn) == 2) {
+						if (rowIndexIn-playerSign <= 0 && columnIndexIn >= indexValues.length+1 && playerIn == 2) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn-playerSign, columnIndexIn, 2, playerIn);
+						}
+					}
+				}
+				nextStep = 5;
+			}
+
+			if (nextStep == 5) {
+				if (0 <= rowIndexIn-playerSign && 0 <= columnIndexIn+playerSign) {
+					if (getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-playerSign, columnIndexIn+playerSign, gameBoard, playerIn) == 2) {
+						if (columnIndexIn+playerSign >= indexValues.length+1 && playerIn == 1) {
+							return true;
+						} else if (rowIndexIn-playerSign <= 0 && columnIndexIn+playerSign >= indexValues.length+1 && playerIn == 2) {
+							return false;
+						} else {
+							return evaluateWin(rowIndexIn-playerSign, columnIndexIn+playerSign, 3, playerIn);
+						}
+					}
+				}
+				nextStep = 0;
+			}
+
+			return evaluateWin(rowIndexIn, columnIndexIn, nextStep, playerIn);
+		}
+
+		function sendPlayerMove() {
+			showMoves();
 		}
 		
-		var randomizeMove = function() {
-			
-			if (playerFlipCard != null && playerPlayCard != null) {
-				
-				if (Math.random() < 0.5) {
-					var tempCard = playerFlipCard;
-					playerFlipCard = playerPlayCard;
-					playerPlayCard = tempCard;
-				}
-				
-				document.getElementById("randomizeFlipInput").disabled = true;
-				document.getElementById("randomizeFlipInput").checked = true;
-				displayMove();
-			}
-		}
-		
-		var drawHexPiece = function(row, column, color) {
+		function drawHexPiece(row, column, color) {
 			drawSVGPiece(row, column, color);
-			drawJSGPiece(row, column, color);
 		}
 		
-		var drawHexCell = function(row, column) {
+		function drawHexCell(row, column) {
 			drawSVGCell(row, column);
-			drawJSGCell(row, column);
+		}
+
+		function getPlayerRowColumn(playerFlipCardIn, playerPlayCardIn) {
+
+			let playerMove = {
+				"row" : null,
+				"column" : null
+			}
+
+			if (playerFlipCardIn) {
+				if ("br".indexOf(playerFlipCardIn.substr(0,1).toLowerCase()) == 1) {
+					playerMove["row"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
+				} else {
+					playerMove["column"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
+				}
+			}
+
+			if (playerPlayCardIn) {
+				if ("br".indexOf(playerPlayCardIn.substr(0,1).toLowerCase()) == 1) {
+					playerMove["row"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
+				} else {
+					playerMove["column"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
+				}
+			}
+
+			return playerMove;
 		}
 		
-		var displayMove = function() {
+		function displayMove() {
+
+			let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
 			
 			if (playerPlayCard == null) {
 				
 				document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
 				document.getElementById("playerPlayCardImg").src = "<%= cardSet %>/blank.png";
 				
-				for (cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
-					
+				for (let cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
 					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/back.png";
-					
-					if ((playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]) == playerFlipCard.toLowerCase()) {
-						if (("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase())) == 2) {
-							playerBoardRow = cardIndex+1;
-						} else {
-							playerBoardColumn = cardIndex+1;
-						}
-					}
 				}
 				
 			} else {
 				
 				document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
 				
-				for (cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
-					
+				for (let cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
 					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/"+"<%= boardHelper.getPlayerSuits() %>".substr("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase()),1)+indexValues[cardIndex]+".png";
-					
-					if ((playerPlayCard.substr(0,1).toLowerCase()+indexValues[cardIndex]) == playerPlayCard.toLowerCase()) {
-						if (("b,r".indexOf(playerPlayCard.substr(0,1).toLowerCase())) == 2) {
-							playerBoardRow = cardIndex+1;
-						} else {
-							playerBoardColumn = cardIndex+1;
-						}
-					}
 				}
-
-				drawHexPiece(playerBoardRow, playerBoardColumn, "cyan");
-
 			}
 				
 			if (playerFlipCard != null && playerPlayCard == null) {
 					
-				if (playerBoardRow != null) {
-					deleteLine = "r"+playerBoardRow;
-					for (lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
-						drawHexPiece(playerBoardRow, lineIndex, "cyan");
+				if (playerMove["row"] != null) {
+					deleteLine = "r"+playerMove["row"];
+					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
+						if (gameBoard[playerMove["row"]][lineIndex] == null) {
+							drawHexPiece(playerMove["row"], lineIndex, "cyan");
+						}
 					}
-				} else if (playerBoardColumn != null) {
-					deleteLine = "c"+playerBoardColumn;
-					for (lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
-						drawHexPiece(lineIndex, playerBoardColumn, "cyan");
+				} else if (playerMove["column"] != null) {
+					deleteLine = "c"+playerMove["column"];
+					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
+						if (gameBoard[lineIndex][playerMove["column"]] == null) {
+							drawHexPiece(lineIndex, playerMove["column"], "cyan");
+						}
 					}
 				}
 					
@@ -224,24 +595,29 @@
 				document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
 				document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
 
-				for (lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
+				for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
 					if (deleteLine.substr(0,1) == "r") {
-						drawHexCell(deleteLine.substr(1,deleteLine.length-1), lineIndex);
+						if (gameBoard[deleteLine.substr(1,deleteLine.length-1)][lineIndex] == null) {
+							drawHexCell(deleteLine.substr(1,deleteLine.length-1), lineIndex);
+						}
 					} else if (deleteLine.substr(0,1) == "c") {
-						drawHexCell(lineIndex, deleteLine.substr(1,deleteLine.length-1));
+						if (gameBoard[lineIndex][deleteLine.substr(1,deleteLine.length-1)] == null) {
+							drawHexCell(lineIndex, deleteLine.substr(1,deleteLine.length-1));
+						}
 					}
 				}
-				drawHexPiece(playerBoardRow, playerBoardColumn, "cyan");
+
+				drawHexPiece(playerMove["row"], playerMove["column"], "cyan");
 			}
 		}
 		
-		var svgHexCell = function(row, column) {
+		function svgHexCell(row, column) {
 		
-			var hexObj = document.createElementNS(svgNS, "polygon");
-			var pointsStr = "";
+			let hexObj = document.createElementNS(svgNS, "polygon");
+			let pointsStr = "";
 			
-			var xCoord = getXCoord(row, column);
-			var yCoord = getYCoord(row, column);
+			let xCoord = getXCoord(row, column);
+			let yCoord = getYCoord(row, column);
 			
 			<%
 				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
@@ -256,7 +632,7 @@
 			%>
 		
 			hexObj.setAttribute("points", pointsStr);
-			hexObj.setAttribute("onclick", "makeCellMove("+row+","+column+");");
+			hexObj.setAttribute("onclick", "makeCellMove("+row+","+column+",player);");
 			
 			hexObj.style.fill="white";
 			hexObj.style.stroke="black";
@@ -264,9 +640,9 @@
 			return hexObj;
 		}
 		
-		var svgHexPiece = function(row, column, color) {
+		function svgHexPiece(row, column, color) {
 			
-			var pieceObj = document.createElementNS(svgNS, "circle");
+			let pieceObj = document.createElementNS(svgNS, "circle");
 			
 			pieceObj.setAttribute("cx", getXCoord(row, column));
 			pieceObj.setAttribute("cy", getYCoord(row, column));
@@ -277,186 +653,653 @@
 			return pieceObj;
 		}
 		
-		var drawSVGPiece = function(row, column, color) {
-			var svgObj = document.getElementById(svgID);
+		function drawSVGPiece(row, column, color) {
+			let svgObj = document.getElementById(svgID);
 			svgObj.appendChild(svgHexPiece(row, column, color));
 		}
 		
-		var drawSVGCell = function(row, column) {
-			var svgObj = document.getElementById(svgID);
+		function drawSVGCell(row, column) {
+			let svgObj = document.getElementById(svgID);
 			svgObj.appendChild(svgHexCell(row, column));
 		}
-		
-		var jsgHexCellXCoords = function(row, column) {
-		
-			var xCoordArray = new Array();
-			var xCoord = getXCoord(row, column);
-			
-			<%
-				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
-					out.println("\t\t\txCoordArray["+pointIndex+"] = xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+");");
-				}
-			%>
-		
-			return xCoordArray;
-		}
-		
-		var jsgHexCellYCoords = function(row, column) {
-		
-			var yCoordArray = new Array();
-			var yCoord = getYCoord(row, column);
-			
-			<%
-				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
-					out.println("\t\t\tyCoordArray["+pointIndex+"] = yCoord+("+String.format("%.15f", (-1)*boardHelper.getPointYDelta(pointIndex))+");");
-				}
-			%>
-		
-			return yCoordArray;
-		}
-		
-		var drawJSGBoard = function() {
-			
-			var canvas = document.getElementById(divID);
-			var jsg = new jsGraphics(canvas);
-			
-			var lrBorderXCoords = new Array();
-			var lrBorderYCoords = new Array();
-			
-			var ulBorderXCoords = new Array();
-			var ulBorderYCoords = new Array();
-			
-			var urBorderXCoords = new Array();
-			var urBorderYCoords = new Array();
-			
-			var llBorderXCoords = new Array();
-			var llBorderYCoords = new Array();
-			
-			lrBorderXCoords[0] = <%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns()) %>;
-			lrBorderXCoords[1] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			lrBorderXCoords[2] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			lrBorderXCoords[3] = <%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns())+boardHelper.getObtuseBorderLength() %>;
-			
-			lrBorderYCoords[0] = <%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>;
-			lrBorderYCoords[1] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			lrBorderYCoords[2] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns())+boardHelper.getAcuteBorderLength() %>;
-			lrBorderYCoords[3] = <%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>;
-			
-			jsg.setColor("red");
-			jsg.fillPolygon(lrBorderXCoords, lrBorderYCoords);
-			jsg.setColor("black")
-			jsg.drawPolygon(lrBorderXCoords, lrBorderYCoords);
-			
-			ulBorderXCoords[0] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1) %>;
-			ulBorderXCoords[1] = <%= boardHelper.getCellXCoord(1, 1) %>;
-			ulBorderXCoords[2] = <%= boardHelper.getCellXCoord(1, 1) %>;
-			ulBorderXCoords[3] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1)-boardHelper.getObtuseBorderLength() %>;
-			
-			ulBorderYCoords[0] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>;
-			ulBorderYCoords[1] = <%= boardHelper.getCellYCoord(1, 1) %>;
-			ulBorderYCoords[2] = <%= boardHelper.getCellYCoord(1, 1)-boardHelper.getAcuteBorderLength() %>;
-			ulBorderYCoords[3] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>;
-			
-			jsg.setColor("red");
-			jsg.fillPolygon(ulBorderXCoords, ulBorderYCoords);
-			jsg.setColor("black")
-			jsg.drawPolygon(ulBorderXCoords, ulBorderYCoords);
-			
-			urBorderXCoords[0] = <%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns()) %>;
-			urBorderXCoords[1] = <%= boardHelper.getCellXCoord(1, 1) %>;
-			urBorderXCoords[2] = <%= boardHelper.getCellXCoord(1, 1) %>;
-			urBorderXCoords[3] = <%= boardHelper.getCellXCoord(1, boardHelper.getBoardColumns())+boardHelper.getObtuseBorderLength() %>;
-			
-			urBorderYCoords[0] = <%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>;
-			urBorderYCoords[1] = <%= boardHelper.getCellYCoord(1, 1) %>;
-			urBorderYCoords[2] = <%= boardHelper.getCellYCoord(1, 1)-boardHelper.getAcuteBorderLength() %>;
-			urBorderYCoords[3] = <%= boardHelper.getCellYCoord(1, boardHelper.getBoardColumns()) %>;
-			
-			jsg.setColor("black");
-			jsg.fillPolygon(urBorderXCoords, urBorderYCoords);
-			jsg.setColor("black")
-			jsg.drawPolygon(urBorderXCoords, urBorderYCoords);
-			
-			llBorderXCoords[0] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1) %>;
-			llBorderXCoords[1] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			llBorderXCoords[2] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			llBorderXCoords[3] = <%= boardHelper.getCellXCoord(boardHelper.getBoardRows(), 1)-boardHelper.getObtuseBorderLength() %>;
-			
-			llBorderYCoords[0] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>;
-			llBorderYCoords[1] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns()) %>;
-			llBorderYCoords[2] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), boardHelper.getBoardColumns())+boardHelper.getAcuteBorderLength() %>;
-			llBorderYCoords[3] = <%= boardHelper.getCellYCoord(boardHelper.getBoardRows(), 1) %>;
 
-			jsg.setColor("black");
-			jsg.fillPolygon(llBorderXCoords, llBorderYCoords);
-			jsg.setColor("black")
-			jsg.drawPolygon(llBorderXCoords, llBorderYCoords);
-			
-			jsg.setColor("white");
-			for (columnIndex = 1; columnIndex <= <%= boardHelper.getBoardColumns() %>; columnIndex++) {
-				for (rowIndex = 1; rowIndex <= <%= boardHelper.getBoardRows() %>; rowIndex++) {
-					jsg.fillPolygon(jsgHexCellXCoords(rowIndex, columnIndex), jsgHexCellYCoords(rowIndex, columnIndex));
-				}
-			}
-			
-			jsg.setColor("black");
-			for (columnIndex = 1; columnIndex <= <%= boardHelper.getBoardColumns() %>; columnIndex++) {
-				for (rowIndex = 1; rowIndex <= <%= boardHelper.getBoardRows() %>; rowIndex++) {
-					jsg.drawPolygon(jsgHexCellXCoords(rowIndex, columnIndex), jsgHexCellYCoords(rowIndex, columnIndex));
+		function startGame() {
+
+			gameBoard = null;
+			voltageBoardIndexes = null;
+
+			gameBoard = [];
+			voltageBoardIndexes = [];
+			let voltageIndex = 0;
+
+			for (let rowIndex = 0; rowIndex <= indexValues.length+1; rowIndex++) {
+				gameBoard.push([]);
+				voltageBoardIndexes.push([]);
+				for (let columnIndex = 0; columnIndex <= indexValues.length+1; columnIndex++) {
+					if (
+						(rowIndex == 0 && columnIndex == indexValues.length+1) ||
+						(rowIndex == indexValues.length+1 && columnIndex == 0)
+					) {
+						gameBoard[rowIndex].push(0);
+					} else if (
+						(rowIndex == 0 && columnIndex == 0) ||
+						(rowIndex == indexValues.length+1 && columnIndex == indexValues.length+1)
+					) {
+						gameBoard[rowIndex].push(0);
+					} else if (rowIndex == 0 || rowIndex == indexValues.length+1) {
+						gameBoard[rowIndex].push(2);
+					} else if (columnIndex == 0 || columnIndex == indexValues.length+1) {
+						gameBoard[rowIndex].push(1);
+					} else {
+						gameBoard[rowIndex].push(null);
+						drawHexCell(rowIndex, columnIndex);
+					}
+					voltageBoardIndexes[rowIndex].push(voltageIndex++);
 				}
 			}
 
-			jsg.setColor("black");
-			jsg.setFont("verdana", "9px", Font.BOLD);
-			for (rowIndex = 1; rowIndex <= <%= boardHelper.getBoardRows() %>; rowIndex++) {
-				jsg.drawString("R"+indexValues[rowIndex-1].toUpperCase(), getXCoord(rowIndex, <%= boardHelper.getBoardColumns()+1 %>)-7, getYCoord(rowIndex, <%= boardHelper.getBoardColumns()+1 %>)-5);
-				jsg.drawString("R"+indexValues[rowIndex-1].toUpperCase(), getXCoord(rowIndex, 0)-10, getYCoord(rowIndex, 0)-5);
+			computerMove = calculateComputerMove(computer);
+			makeCellMove(computerMove["row"], computerMove["column"], computer);
+			showMoves();
+		}
+
+		function calculateComputerMove(playerIn) {
+
+			let computerMove = {};
+			let avgRatioNorm = 0;
+
+			let voltageBoardVectors = [null, calculateVoltages(1), calculateVoltages(2)];
+
+			if (voltageBoardVectors[1].length && voltageBoardVectors[2].length) {
+				console.log(voltageBoardVectors);
+				computerMove = evaluateMoves(playerIn, calculateVoltageDeltas(voltageBoardVectors[1]), calculateVoltageDeltas(voltageBoardVectors[2]));
 			}
 
-			jsg.setColor("white");
-			jsg.setFont("verdana", "9px", Font.BOLD);
-			for (columnIndex = 1; columnIndex <= <%= boardHelper.getBoardColumns() %>; columnIndex++) {
-				jsg.drawString("B"+indexValues[columnIndex-1].toUpperCase(), getXCoord(<%= boardHelper.getBoardRows()+1 %>, columnIndex)-10, getYCoord(<%= boardHelper.getBoardRows()+1 %>, columnIndex)-5);
-				jsg.drawString("B"+indexValues[columnIndex-1].toUpperCase(), getXCoord(0, columnIndex)-7, getYCoord(0, columnIndex)-5);
+			return computerMove;
+		}
+
+		function resetVoltageSolutions(indexesLengthIn) {
+
+			let voltageBoardSolutions = [];
+
+			for (let rowIndex = 0; rowIndex <= indexesLengthIn; rowIndex++) {
+				for (let columnIndex = 0; columnIndex <= indexesLengthIn; columnIndex++) {
+					voltageBoardSolutions.push(0);
+				}
+			}
+
+			return voltageBoardSolutions;
+		}
+
+		function resetVoltageBoards(solutionsLengthIn) {
+
+			let voltageBoard = [];
+
+			for (let rowIndex = 0; rowIndex < solutionsLengthIn; rowIndex++) {
+				voltageBoard.push([]);
+				for (let colIndex = 0; colIndex <  solutionsLengthIn; colIndex++) {
+					voltageBoard[rowIndex].push(0);
+				}
+			}
+
+			return voltageBoard;
+		}
+
+		function calculateVoltages(playerIn) {
+
+			let returnVoltages = [];
+
+			let voltageBoardSolutions = resetVoltageSolutions(indexValues.length+1);
+			let voltageBoards = resetVoltageBoards(voltageBoardSolutions.length);
+
+			for (let rowIndex = 0; rowIndex <= indexValues.length+1; rowIndex++) {
+				for (let columnIndex = 0; columnIndex <= indexValues.length+1; columnIndex++) {
+
+					if (rowIndex == 0 && columnIndex == 0) {
+						continue;
+					} else if (rowIndex == indexValues.length+1 && columnIndex == indexValues.length+1) {
+						continue;
+					} else if (rowIndex == 0 && playerIn == 2) {
+						voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = 1;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = testVoltage;
+					} else if (columnIndex == 0 && playerIn == 1) {
+						voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = 1;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = testVoltage;
+					} else if (rowIndex == 0 && playerIn == 1) {
+						voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = 1;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = 0;
+					} else if (columnIndex == 0 && playerIn == 2) {
+						voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = 1;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = 0;
+					} else if (rowIndex == indexValues.length+1 || columnIndex == indexValues.length+1) {
+						voltageBoards[playerIn][voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = 1;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = 0;
+					} else {
+
+						let connCount = 0;
+						let sameCount = 0;
+						let signCount = -1;
+
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex+1, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex-1, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex+1, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex-1, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex, gameBoard, playerIn) == 2) {
+							sameCount++;
+						}
+
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex]] = -2/sameCount;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex+1, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex+1]] -2/sameCount;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex-1, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex-1]] = -2/sameCount;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex+1, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex+1]] = -2/sameCount;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex-1, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex-1]] = -2/sameCount;
+						}
+						if (getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex, gameBoard, playerIn) == 2) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex]] = -2/sameCount;
+						}
+
+						if (sameCount) {
+							signCount = 1;
+						}
+
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex]] = signCount;
+							connCount++;
+						}
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex-1, columnIndex+1, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex+1]] = signCount;
+							connCount++;
+						}
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex-1, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex-1]] = signCount;
+							connCount++;
+						}
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex, columnIndex+1, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex+1]] = signCount;
+							connCount++;
+						}
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex-1, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex-1]] = signCount;
+							connCount++;
+						}
+						if ([1, 3].indexOf(getVoltageRelationship(rowIndex, columnIndex, rowIndex+1, columnIndex, gameBoard, playerIn)) > -1) {
+							voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex]] = signCount;
+							connCount++;
+						}
+
+						voltageBoards[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex]] = connCount;
+						voltageBoardSolutions[voltageBoardIndexes[rowIndex][columnIndex]] = 0;
+					}
+				}
+			}
+
+			try {
+				let sparseVoltageMatrix = numeric.ccsSparse(voltageBoards);
+				returnVoltages = numeric.ccsLUPSolve(numeric.ccsLUP(sparseVoltageMatrix), voltageBoardSolutions);
+			} catch (err) {
+				console.log(err);
 			}
 			
-			jsg.paint();
+			return returnVoltages;
 		}
-		
-		var drawJSGCell = function(row, column) {
-			
-			var canvas = document.getElementById(divID);
-			var jsg = new jsGraphics(canvas);
-			
-			jsg.setColor("white");
-			jsg.fillPolygon(jsgHexCellXCoords(row, column), jsgHexCellYCoords(row, column));
-			
-			jsg.setColor("black");
-			jsg.drawPolygon(jsgHexCellXCoords(row, column), jsgHexCellYCoords(row, column));
-			
-			jsg.paint();
-		}
-		
-		var drawJSGPiece = function(row, column, color) {
-			
-			var canvas = document.getElementById(divID);
-			var jsg = new jsGraphics(canvas);
-			
-			var xCoord = getXCoord(row, column)-(<%= boardHelper.getPieceRadius() %>);
-			var yCoord = getYCoord(row, column)-(<%= boardHelper.getPieceRadius() %>);
-			var diameter = <%= boardHelper.getPieceRadius()*2 %>;
 
-			jsg.setColor(color);
-			jsg.fillEllipse(xCoord, yCoord, diameter, diameter);
-			jsg.setColor("black");
-			jsg.drawEllipse(xCoord, yCoord, diameter, diameter);
+		function getVoltageRelationship(refRow, refCol, calcRow, calcCol, gameBoardIn, playerIn) {
+
+			if (gameBoardIn[refRow][refCol] == null && gameBoardIn[calcRow][calcCol] == playerIn) {
+				return 1;
+			} else if (gameBoardIn[refRow][refCol] == playerIn && gameBoardIn[calcRow][calcCol] == null) {
+				return 1;
+			} else if (gameBoardIn[refRow][refCol] == null && gameBoardIn[calcRow][calcCol] == 0) {
+				return 1;
+			} else if (gameBoardIn[refRow][refCol] == 0 && gameBoardIn[calcRow][calcCol] == null) {
+				return 1;
+			} else if (gameBoardIn[refRow][refCol] == playerIn && gameBoardIn[calcRow][calcCol] == playerIn) {
+				return 2;
+			} else if (gameBoardIn[refRow][refCol] == 0 && gameBoardIn[calcRow][calcCol] == playerIn) {
+				return 2;
+			} else if (gameBoardIn[refRow][refCol] == playerIn && gameBoardIn[calcRow][calcCol] == 0) {
+				return 2;
+			} else if (gameBoardIn[refRow][refCol] == null && gameBoardIn[calcRow][calcCol] == null) {
+				return 3;
+			}
+
+			return 0;
+		}
+
+		function calculateVoltageDeltas(voltageBoardVectors) {
+
+			let deltasOut = [];
+
+			for (let rowIndex = 0; rowIndex < voltageBoardVectors.length; rowIndex++) {
+				deltasOut.push([]);
+				for (let columnIndex = 0; columnIndex < voltageBoardVectors.length; columnIndex++) {
+					deltasOut[rowIndex].push(0);
+				}
+			}
+
+			for (let rowIndex = 1; rowIndex <= indexValues.length; rowIndex++) {
+				for (let columnIndex = 1; columnIndex <= indexValues.length; columnIndex++) {
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex-1][columnIndex]];
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex-1][columnIndex+1]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex-1][columnIndex+1]];
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex-1]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex-1]];
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex][columnIndex+1]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex+1]];
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex-1]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex+1][columnIndex-1]];
+					deltasOut[voltageBoardIndexes[rowIndex][columnIndex]][voltageBoardIndexes[rowIndex+1][columnIndex]] = voltageBoardVectors[voltageBoardIndexes[rowIndex][columnIndex]] - voltageBoardVectors[voltageBoardIndexes[rowIndex+1][columnIndex]];
+				}
+			}
+
+			return deltasOut;
+		}
+
+		function evaluateMoveDeltas(rowIndexIn, columnIndexIn, playerIn, deltasIn) {
+
+			let moveEval = 0;
+
+			if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn -1, columnIndexIn, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn-1][columnIndexIn]];
+			} else if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn-1][columnIndexIn+1]];
+			} else if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn][columnIndexIn-1]];
+			} else if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn][columnIndexIn+1]];
+			} else if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn+1][columnIndexIn-1]];
+			} else if ([1, 3].indexOf(getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameBoard, playerIn)) > -1) {
+				moveEval += deltasIn[voltageBoardIndexes[rowIndexIn][columnIndexIn]][voltageBoardIndexes[rowIndexIn+1][columnIndexIn]];
+			}
+
+			return moveEval;
+		}
+
+		function moveBordersOpponent(rowIndexIn, columnIndexIn, gameStateIn, playerIn) {
+
+			let moveEval = false;
+			let opponent = (playerIn % 2) + 1;
+
+			if (
+				0 >= rowIndexIn-1 ||
+				gameStateIn.length <= rowIndexIn+1 ||
+				0 >= columnIndexIn-1 ||
+				gameStateIn.length <= columnIndexIn+1
+			) {
+				moveEval = false;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn -1, columnIndexIn, gameStateIn, opponent)) {
+				moveEval = true;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, opponent)) {
+				moveEval = true;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, opponent)) {
+				moveEval = true;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, opponent)) {
+				moveEval = true;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, opponent)) {
+				moveEval = true;
+			} else if (!getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, playerIn) && getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, opponent)) {
+				moveEval = true;
+			}
+
+			return moveEval;
+		}
+
+		function moveFitsOpponentDiamond(rowIndexIn, columnIndexIn, gameStateIn, playerIn) {
+
+			let moveEval = false;
+			let opponent = (playerIn % 2) + 1;
+
+			if (
+				0 >= rowIndexIn-2 ||
+				gameStateIn.length <= rowIndexIn+2 ||
+				0 >= columnIndexIn-2 ||
+				gameStateIn.length <= columnIndexIn+2
+			) {
+				moveEval = false;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn+1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn-1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+2, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-2, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+2, columnIndexIn-1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-2, columnIndexIn+1, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn, gameStateIn, opponent) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, opponent) == 1
+			) {
+				moveEval = true;
+			}
+
+			return moveEval;
+		}
+
+		function moveFitsEstablishedDiamond(rowIndexIn, columnIndexIn, gameStateIn, playerIn) {
+
+			let moveEval = [];
+
+			if (
+				0 >= rowIndexIn-2 ||
+				gameStateIn.length <= rowIndexIn+2 ||
+				0 >= columnIndexIn-2 ||
+				gameStateIn.length <= columnIndexIn+2
+			) {
+				moveEval = [];
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn+1, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, playerIn) == 1
+			) {
+				moveEval.push({"row" : rowIndexIn+1, "column" : columnIndexIn});
+				moveEval.push({"row" : rowIndexIn, "column" : columnIndexIn+1});
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn-1, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, playerIn) == 1) {
+				moveEval.push({"row" : rowIndexIn-1, "column" : columnIndexIn});
+				moveEval.push({"row" : rowIndexIn, "column" : columnIndexIn-1});
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+2, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn+1, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, playerIn) == 1
+			) {
+				moveEval.push({"row" : rowIndexIn, "column" : columnIndexIn+1});
+				moveEval.push({"row" : rowIndexIn-1, "column" : columnIndexIn+1});
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-2, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn, columnIndexIn-1, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, playerIn) == 1
+			) {
+				moveEval.push({"row" : rowIndexIn, "column" : columnIndexIn-1});
+				moveEval.push({"row" : rowIndexIn+1, "column" : columnIndexIn-1});
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+2, columnIndexIn-1, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn+1, columnIndexIn-1, gameStateIn, playerIn) == 1
+			) {
+				moveEval.push({"row" : rowIndexIn+1, "column" : columnIndexIn});
+				moveEval.push({"row" : rowIndexIn+1, "column" : columnIndexIn-1});
+			} else if (
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-2, columnIndexIn+1, gameStateIn, playerIn) == 2 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn, gameStateIn, playerIn) == 1 &&
+				getVoltageRelationship(rowIndexIn, columnIndexIn, rowIndexIn-1, columnIndexIn+1, gameStateIn, playerIn) == 1
+			) {
+				moveEval.push({"row" : rowIndexIn-1, "column" : columnIndexIn});
+				moveEval.push({"row" : rowIndexIn-1, "column" : columnIndexIn+1});
+			}
+
+			return moveEval;
+		}
+
+		function moveAdvantageousOpponent(rowIndexIn, columnIndexIn, gameStateIn, playerIn) {
+
+			let moveEval = false;
+
+			if (moveFitsOpponentDiamond(rowIndexIn, columnIndexIn, gameStateIn, playerIn)) {
+				moveEval = true;
+			} else if (moveBordersOpponent(rowIndexIn, columnIndexIn, gameStateIn, playerIn)) {
+				moveEval = true;
+			}
+
+			return moveEval;
+		}
+
+		function getDefensiveMoves(playerIn, gameStateIn, playerFactorsIn, opponentFactorsIn) {
+
+			let opponent = (playerIn % 2) + 1;
 			
-			jsg.paint();
+			let playerMovesReturn = [];
+
+			if (!playerMovesReturn.length) {
+				for (let rowIndex = 0; rowIndex < gameStateIn.length; rowIndex++) {
+					for (let columnIndex = 0; columnIndex < gameStateIn[rowIndex].length; columnIndex++) {
+						if (gameStateIn[rowIndex][columnIndex] == opponent) {
+							let diamonds = moveFitsEstablishedDiamond(rowIndex, columnIndex, gameStateIn, opponent);
+							if (diamonds.length) {
+								for (let moveIndex = 0; moveIndex < diamonds.length; moveIndex+=2) {
+									if (gameStateIn[diamonds[moveIndex]["row"]][diamonds[moveIndex]["column"]] == null && gameStateIn[diamonds[moveIndex+1]["row"]][diamonds[moveIndex+1]["column"]] == null) {
+										playerMovesReturn.push({
+											"playerFactor" : playerFactorsIn[diamonds[moveIndex]["row"]][diamonds[moveIndex]["column"]],
+											"opponentFactor" : opponentFactorsIn[diamonds[moveIndex]["row"]][diamonds[moveIndex]["column"]],
+											"normPlayerFactor" : null,
+											"normOpponentFactor" : null,
+											"ratioNormFactor" : null,
+											"row" : diamonds[moveIndex]["row"]+1,
+											"column" : diamonds[moveIndex]["column"]+1
+										});
+										playerMovesReturn.push({
+											"playerFactor" : playerFactorsIn[diamonds[moveIndex+1]["row"]][diamonds[moveIndex+1]["column"]],
+											"opponentFactor" : opponentFactorsIn[diamonds[moveIndex+1]["row"]][diamonds[moveIndex+1]["column"]],
+											"normPlayerFactor" : null,
+											"normOpponentFactor" : null,
+											"ratioNormFactor" : null,
+											"row" : diamonds[moveIndex+1]["row"]+1,
+											"column" : diamonds[moveIndex+1]["column"]+1
+										});
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			for (let rowIndex = 0; rowIndex < gameStateIn.length; rowIndex++) {
+				for (let columnIndex = 0; columnIndex < gameStateIn[rowIndex].length; columnIndex++) {
+					if (gameStateIn[rowIndex][columnIndex] == null) {
+						if (moveAdvantageousOpponent(rowIndex, columnIndex, gameStateIn, playerIn)) {
+							playerMovesReturn.push({
+								"playerFactor" : playerFactorsIn[rowIndex][columnIndex],
+								"opponentFactor" : opponentFactorsIn[rowIndex][columnIndex],
+								"normPlayerFactor" : null,
+								"normOpponentFactor" : null,
+								"ratioNormFactor" : null,
+								"row" : rowIndex+1,
+								"column" : columnIndex+1
+							});
+						}
+					}
+				}
+			}
+
+			return playerMovesReturn;
+		}
+
+		function setupMovesReturn(moveReturnIn) {
+
+			let moveReturnOut = moveReturnIn;
+
+			let playerMoveCount = 0;
+			let playerMovesSum = 0;
+			let playerMaxFactor = 0;
+
+			let opponentMoveCount = 0;
+			let opponentMovesSum = 0;
+			let opponentMaxFactor = 0;
+
+			let ratioNormCount = 0;
+			let ratioNormsSum = 0;
+
+			for (let moveIndex = 0; moveIndex < moveReturnOut.length; moveIndex++) {
+				if (moveReturnOut[moveIndex]["playerFactor"] != null) {
+					playerMoveCount++;
+					playerMovesSum += moveReturnOut[moveIndex]["playerFactor"];
+					playerMaxFactor = (playerMaxFactor < moveReturnOut[moveIndex]["playerFactor"] ? moveReturnOut[moveIndex]["playerFactor"] : playerMaxFactor);
+				}
+				if (moveReturnOut[moveIndex]["opponentFactor"] != null) {
+					opponentMoveCount++;
+					opponentMovesSum += moveReturnOut[moveIndex]["opponentFactor"];
+					opponentMaxFactor = (opponentMaxFactor < moveReturnOut[moveIndex]["opponentFactor"] ? moveReturnOut[moveIndex]["opponentFactor"] : opponentMaxFactor);
+				}
+			}
+
+			for (let moveIndex = 0; moveIndex < moveReturnOut.length; moveIndex++) {
+
+				if (moveReturnOut[moveIndex]["playerFactor"] != null && moveReturnOut[moveIndex]["opponentFactor"] != null) {
+					moveReturnOut[moveIndex]["normPlayerFactor"] = moveReturnOut[moveIndex]["playerFactor"]*playerMoveCount/playerMovesSum;
+					moveReturnOut[moveIndex]["normOpponentFactor"] = moveReturnOut[moveIndex]["opponentFactor"]*opponentMoveCount/opponentMovesSum;
+					moveReturnOut[moveIndex]["ratioNormFactor"] = moveReturnOut[moveIndex]["normPlayerFactor"]/moveReturnOut[moveIndex]["normOpponentFactor"];
+					ratioNormCount++;
+					ratioNormsSum += moveReturnOut[moveIndex]["ratioNormFactor"];
+				}
+
+				if (moveReturnOut[moveIndex]["playerFactor"] == null) {
+					moveReturnOut[moveIndex]["playerFactor"] = playerMaxFactor;
+				}
+				if (moveReturnOut[moveIndex]["opponentFactor"] == null) {
+					moveReturnOut[moveIndex]["opponentFactor"] = opponentMaxFactor;
+				}
+			}
+
+			moveReturnOut.sort(
+				function(a, b) {
+					return a["ratioNormFactor"] - b["ratioNormFactor"];
+				}
+			);
+
+			return [ratioNormsSum/ratioNormCount, moveReturnOut];
+		}
+
+		function evaluateMoves(playerIn, playerDeltas, opponentDeltas) {
+
+			let opponent = (playerIn % 2) + 1;
+
+			let gameState = [];
+
+			let playerFactors = [];
+			let opponentFactors = [];
+
+			let playerMoves = [];
+			let playerMoveReturn = null;
+			let playerMovesOut = [];
+
+			let playerEvals = [];
+			let opponentEvals = [];
+
+			for (let rowIndex = 1; rowIndex <= indexValues.length; rowIndex++) {
+				playerFactors.push([]);
+				opponentFactors.push([]);
+				gameState.push([]);
+				for (let columnIndex = 1; columnIndex <= indexValues.length; columnIndex++) {
+					playerFactors[rowIndex-1].push(null);
+					opponentFactors[rowIndex-1].push(null);
+					gameState[rowIndex-1].push(null);
+					if (gameBoard[rowIndex][columnIndex] == null) {
+
+						playerEvals.push(evaluateMoveDeltas(rowIndex, columnIndex, playerIn, playerDeltas));
+						opponentEvals.push(evaluateMoveDeltas(rowIndex, columnIndex, opponent, opponentDeltas));
+
+						playerEvals[playerEvals.length-1] *= playerEvals[playerEvals.length-1];
+						playerEvals[playerEvals.length-1] /= 6;
+						playerEvals[playerEvals.length-1] = Math.sqrt(playerEvals[playerEvals.length-1]);
+
+						opponentEvals[opponentEvals.length-1] *= opponentEvals[opponentEvals.length-1];
+						opponentEvals[opponentEvals.length-1] /= 6;
+						opponentEvals[opponentEvals.length-1] = Math.sqrt(opponentEvals[opponentEvals.length-1]);
+
+						playerFactors[rowIndex-1][columnIndex-1] = (playerEvals[playerEvals.length-1] ? opponentEvals[opponentEvals.length-1]/playerEvals[playerEvals.length-1] : null);
+						opponentFactors[rowIndex-1][columnIndex-1] = (opponentEvals[opponentEvals.length-1] ? playerEvals[playerEvals.length-1]/opponentEvals[opponentEvals.length-1] : null);
+
+						playerMoves.push({
+							"playerFactor" : playerFactors[rowIndex-1][columnIndex-1],
+							"opponentFactor" : opponentFactors[rowIndex-1][columnIndex-1],
+							"normPlayerFactor" : null,
+							"normOpponentFactor" : null,
+							"ratioNormFactor" : null,
+							"row" : rowIndex,
+							"column" : columnIndex
+						});
+
+					} else {
+						gameState[rowIndex-1][columnIndex-1] = gameBoard[rowIndex][columnIndex];
+					}
+				}
+			}
+
+			[ratioNormsAvg, playerMovesOut] = setupMovesReturn(playerMoves);
+			console.log("ratioNormsAvg", ratioNormsAvg, "; playerMovesOut", playerMovesOut);
+
+			if (ratioNormsAvg > defenseFactor) {
+				let tempNormsAvg;
+				let defensiveMoves = [];
+				[tempNormsAvg, defensiveMoves] = setupMovesReturn(getDefensiveMoves(playerIn, gameState, playerFactors, opponentFactors));
+
+				for (let moveIndex = 0; moveIndex < defensiveMoves.length; moveIndex++) {
+					if (defensiveMoves[moveIndex]["playerFactor"] > defensiveMoves[moveIndex]["opponentFactor"] && moveIndex-1 > 0) {
+						playerMoveReturn = defensiveMoves[moveIndex-1];
+						break;
+					} else if (defensiveMoves[moveIndex]["playerFactor"] > defensiveMoves[moveIndex]["opponentFactor"]) {
+						playerMoveReturn = defensiveMoves[moveIndex];
+						break;
+					}
+				}
+
+			} else if (defenseFactor-offenseRange <= ratioNormsAvg && ratioNormsAvg <= defenseFactor) {
+				playerMoveReturn = playerMovesOut[Math.floor(playerMovesOut.length/2)];
+			} else {
+				playerMoveReturn = playerMovesOut[playerMovesOut.length-1];
+			}
+
+			if (playerMoveReturn == null) {
+				for (let moveIndex = 0; moveIndex < playerMovesOut.length; moveIndex++) {
+					if (playerMovesOut[moveIndex]["playerFactor"] > playerMovesOut[moveIndex]["opponentFactor"] && moveIndex-1 > 0) {
+						playerMoveReturn = playerMovesOut[moveIndex-1];
+						break;
+					} else if (playerMovesOut[moveIndex]["playerFactor"] > playerMovesOut[moveIndex]["opponentFactor"]) {
+						playerMoveReturn = playerMovesOut[moveIndex];
+						break;
+					}
+				}
+			}
+
+			console.log("playerMoveReturn", playerMoveReturn);
+
+			return playerMoveReturn;
 		}
 	</script>
   </head>
 
-  <body onload="drawJSGBoard();">
+  <body>
   	<table align="center" style="background-color: #004400;">
   		<tr>
   			<td>
@@ -552,7 +1395,7 @@
 			}
 %>
 							"
-							onclick="makeCellMove(<%= i %>,<%= j %>);"
+							onclick="drawHexCell(<%= i %>, <%= j %>, player);"
 							style="stroke: black; fill: white;"
 							/>
 <%
@@ -582,8 +1425,10 @@
 						<img id="playerPlayCardImg" src="<%= cardSet %>/blank.png" width="54" height="72"><br />
   					</td>
   					<td>
-  						<input type="button" value="Send Move"><br />
-  						<input id="randomizeFlipInput" type="checkbox" onclick="randomizeMove();" disabled="disabled"> Randomize Flip
+						<a style="color: white;" href="http://www.thegamecrafter.com/games/battle-hex">Play the board game</a><br />
+  						<input id="newGame" type="button" value="New Game" onclick="startGame();" /><br />
+  						<input id="sendMove" type="button" value="Send Move" disabled="disabled" onclick="sendPlayerMove();" /><br />
+  						<input id="randomizeFlipInput" type="checkbox" /> Randomize Flip
   					</td>
   					<tr>
 		  				<td colspan="2" style="text-align: center;">Black</td>
@@ -613,7 +1458,7 @@
 				String rank = ranks[i][k];
 %>
 		  				
-		  						<img id="<%= line %><%= rank %>" src="<%= cardSet %>/<%= suit %><%= rank %>.png" width="54" height="72" onclick="makeMove('<%= line %><%= rank %>');">
+		  						<img id="<%= line %><%= rank %>" src="<%= cardSet %>/<%= suit %><%= rank %>.png" width="54" height="72" onclick="makeMove('<%= line %><%= rank %>', player);">
 <%
 			}
 %>
@@ -629,21 +1474,6 @@
   			</table>
   			</td>
   		</tr>
-  		<tr>
-  			<td>
-  				<div
-  					id="divBoard"
-  					style="
-  						position: relative;
-  						width: <%= boardHelper.getImageWidth() %>;
-  						height: <%= boardHelper.getImageHeight() %>;
-  						background: #004400;">
-  				</div>
-  			</td>
-  			<td>
-  				<input type="button" value="Draw Piece" onclick="drawJSGPiece(8, 5, 'black');">
-  			</td>
-  		<tr>
   	</table>
   </body>
 </html>

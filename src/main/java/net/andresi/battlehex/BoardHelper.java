@@ -336,4 +336,17 @@ public class BoardHelper {
 
 		return returnSuits;
 	}
+
+	public String getOpponentSuits() {
+
+		String returnSuits = "";
+
+		if (getPlayer() == SECOND_PLAYER) {
+			returnSuits = "s,d";
+		} else if (getPlayer() == FIRST_PLAYER) {
+			returnSuits = "c,h";
+		}
+
+		return returnSuits;
+	}
 }
