@@ -1,0 +1,6 @@
+{
+    "short_name" : "BattleHex",
+    "name" : "Battle Hex version 0.1",
+    "start_url" : "index.jsp",
+    "gcm_sender_id" : "103953800507"
+}
