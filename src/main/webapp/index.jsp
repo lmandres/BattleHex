@@ -8,7 +8,7 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
     <title>Battle Hex</title>
-    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"/>
+    <link type="text/css" rel="stylesheet" href="main.css"/>
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="manifest" href="/manifest.json">
   </head>
