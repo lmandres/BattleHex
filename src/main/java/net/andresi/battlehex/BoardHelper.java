@@ -1,7 +1,31 @@
 package battlehex;
 
 import java.lang.Math;
+
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import java.net.URL;
+
 import org.apache.commons.lang3.ArrayUtils;
+
+import com.google.api.client.json.JsonParser;
+import com.google.api.client.json.JsonToken;
+import com.google.api.client.json.gson.GsonFactory;
+
+import com.google.appengine.api.users.User;
+import com.google.cloud.Timestamp;
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreOptions;
+import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.Entity.Builder;
+import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.Query;
+import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 
 public class BoardHelper {
 	
@@ -14,6 +38,12 @@ public class BoardHelper {
 	
 	private int imageWidth, imageHeight, boardRows, boardColumns, boardShape;	
 	private double startXCoord, startYCoord, cellRadius;
+
+	private Key gameKey;
+	private String appNotifierKey;
+
+	static final String AUTH_KEY = "AAAAWaB3uw0:APA91bFq04mXdoMaiLN0hNEF6KZvsdpW8UKKVGrKaVNST7sqFGDBXB4bdeQFFlwqujrROsGWGGyxmBZJ0saDh0Ou5JPdeeRntgS9pbhShN8W12d7P95Txp6aO8itTOW8y5USreaQMcVH";
+	User user = null;
 	
 	public BoardHelper() {
 		
@@ -45,6 +75,17 @@ public class BoardHelper {
 	
 	public int getPlayer() {
 		return boardShape & 0x0003;
+	}
+	
+	public int getOpponent() {
+
+		int returnPlayer = FIRST_PLAYER;
+
+		if ((boardShape & 0x0003) == FIRST_PLAYER) {
+			returnPlayer = SECOND_PLAYER;
+		}
+
+		return returnPlayer;
 	}
 	
 	public void setBoardShape(int bShapeIn) {
@@ -348,5 +389,240 @@ public class BoardHelper {
 		}
 
 		return returnSuits;
+	}
+
+        private JsonParser postJSONToURL(String url, String jsonContent) {
+
+		DataOutputStream outputstream = null;
+		GsonFactory gsonFactory = new GsonFactory();
+		JsonParser jsonParser = null;
+
+		URL urlObj = null;
+		HttpURLConnection conn = null;
+
+		try {
+			urlObj = new URL(url);
+		} catch (MalformedURLException mue) {
+		}
+
+		try {
+			conn = (HttpURLConnection)urlObj.openConnection();
+		} catch (IOException ioe) {
+		}
+
+		try {
+			conn.setRequestMethod("POST");
+		} catch (ProtocolException pe) {
+		}
+
+		conn.setRequestProperty("Content-Type", "application/json");
+		conn.setRequestProperty("Authorization", "key=" + AUTH_KEY);
+
+		try {
+			outputstream = (DataOutputStream)conn.getOutputStream();
+			outputstream.writeBytes(jsonContent);
+			outputstream.close();
+		} catch (IOException ioe) {
+		}
+
+		try {
+			jsonParser = gsonFactory.createJsonParser(conn.getInputStream());
+		} catch (IOException ioe) {
+		}
+
+		return jsonParser;
+	}
+	public void notifyPlayers() {
+
+		Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+
+		Entity game = null;
+
+		Query<Entity> query = Query.newEntityQueryBuilder()
+			.setKind("Game")
+			.setFilter(PropertyFilter.eq("gameKey", gameKey))
+			.build()
+		;
+		QueryResults<Entity> games = datastore.run(query);
+
+		while (games.hasNext()) {
+
+			game = games.next();
+
+			if (game.getKey() != null) {
+
+				String url = "https://fcm.googleapis.com/fcm/send";
+				String content = "";
+
+				content += "{";
+				content += "\"notification\": ";
+				content += "{";
+				content += "\"notification_key_name\": \"" + appNotifierKey + "\",";
+				content += "\"registration_ids\": []";
+				content += "}, ";
+				content += "\"to\": \"" +  game.getString("notificationKey") + "\",";
+				content += "}";
+
+				postJSONToURL(url, content);
+			}
+		}
+	}
+
+	public void addGameListener(String fbTokenIn) {
+
+		Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+
+		Entity game = null;
+
+		Query<Entity> query = Query.newEntityQueryBuilder()
+			.setKind("Game")
+			.setFilter(PropertyFilter.eq("gameKey", gameKey))
+			.build()
+		;
+		QueryResults<Entity> games = datastore.run(query);
+
+		while (games.hasNext()) {
+
+			game = games.next();
+
+			if (game.getKey() != null) {
+
+				String url = "https://android.googleapis.com/gcm/notification";
+				String content = "";
+
+				content += "{";
+				content += "\"operation\": \"add\",";
+				content += "\"notification_key_name\": \"" + appNotifierKey + "\",";
+				content += "\"notification_key\": \"" + game.getString("notificationKey") + "\",";
+				content += "\"registration_ids\": [\"" + fbTokenIn + "\"]";
+				content += "}";
+
+				postJSONToURL(url, content);
+			}
+		}
+	}
+
+	public Key getNewGame(User user, int playerIn) throws IOException {
+
+		Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+		JsonParser jsonParser = null;
+		JsonToken jsonToken = null;
+
+		String url = "https://android.googleapis.com/gcm/notification";
+		String content;
+
+		String kind = "Game";
+		String name = "gameKey";
+
+		String gameListenerKey = "";
+
+		String player1Nickname = "";
+		String player1ID = "";
+		String player2Nickname = "";
+		String player2ID = "";
+	
+		gameKey = datastore.newKeyFactory().setKind(kind).newKey(name);
+
+		if (playerIn == BoardHelper.FIRST_PLAYER) {
+			player1Nickname = user.getNickname();
+			player1ID = user.getUserId();
+		} else if (playerIn == BoardHelper.SECOND_PLAYER) {
+			player2Nickname = user.getNickname();
+			player2ID = user.getUserId();
+		}
+
+		appNotifierKey = "app_battle-hex_game_" + gameKey.toUrlSafe();
+
+		content = "";
+		content += "{";
+		content += "\"operation\": \"create\",";
+		content += "\"notification_key_name\": \"" + appNotifierKey + "\",";
+		content += "\"registration_ids\": []";
+		content += "}";
+
+		jsonParser = postJSONToURL(url, content);
+
+		while (jsonParser.nextToken() != null) {
+			jsonToken = jsonParser.getCurrentToken();
+			if (jsonToken == JsonToken.FIELD_NAME) {
+				if (jsonParser.getText() == "notification_key") {
+					jsonToken = jsonParser.nextToken();
+					gameListenerKey = jsonParser.getText();
+					break;
+				}
+			}
+		}
+
+		Entity game = Entity.newBuilder(gameKey)
+			.set("player1Nickname", player1Nickname)
+			.set("player2Nickname", player2Nickname)
+			.set("player1ID", player1ID)
+			.set("player2ID", player2ID)
+			.set("notificationKey", gameListenerKey)
+			.set("lastModified", Timestamp.now())
+			.build()
+		;
+		datastore.put(game);
+
+		return gameKey;
+	}
+
+	public Key joinExistingGame(User user, String keyIn) {
+
+		String player1Nickname = "";
+		String player1ID = "";
+		String player2Nickname = "";
+		String player2ID = "";
+
+		Entity game = null;
+
+		Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+
+		Query<Entity> query = Query.newEntityQueryBuilder()
+			.setKind("Game")
+			.setFilter(PropertyFilter.eq("gameKey", Key.fromUrlSafe(keyIn)))
+			.build()
+		;
+		QueryResults<Entity> games = datastore.run(query);
+
+		while (games.hasNext()) {
+
+			game = games.next();
+
+			Entity gameOut = null;
+
+			if (game.getString("player1ID") == "") {
+				gameOut = Entity.newBuilder(game.getKey("gameKey"))
+					.set("player1Nickname", user.getNickname())
+					.set("player1ID", user.getUserId())
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+			} else {
+				gameOut = Entity.newBuilder(game.getKey("gameKey"))
+					.set("player2Nickname", user.getNickname())
+					.set("player2ID", user.getUserId())
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+			}
+
+			datastore.update(gameOut);
+		}
+		gameKey = game.getKey("gameKey");
+
+		return gameKey;
+	}
+
+	public void setGameKey(Key gameKeyIn) {
+		gameKey = gameKeyIn;
+	}
+
+	public void setGameKeyUrlSafe(String gameKeyIn) {
+		gameKey = Key.fromUrlSafe(gameKeyIn);
+	}
+
+	public Key getGameKey() {
+		return gameKey;
 	}
 }

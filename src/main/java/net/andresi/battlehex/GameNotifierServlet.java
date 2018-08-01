@@ -8,28 +8,62 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.net.ssl.HttpsURLConnection;
+
+import com.google.appengine.api.users.User;
+import com.google.appengine.api.users.UserService;
+import com.google.appengine.api.users.UserServiceFactory;
+import com.google.cloud.datastore.Key;
 
 public class GameNotifierServlet extends HttpServlet {
 
-	static final String AUTH_KEY = "AAAAWaB3uw0:APA91bFq04mXdoMaiLN0hNEF6KZvsdpW8UKKVGrKaVNST7sqFGDBXB4bdeQFFlwqujrROsGWGGyxmBZJ0saDh0Ou5JPdeeRntgS9pbhShN8W12d7P95Txp6aO8itTOW8y5USreaQMcVH";
-
 	public void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-		resp.setContentType("text/plain");
-		resp.getWriter().println("Hello, World!");
+		doPost(req, resp);
 	}
 
-	private void notifyPlayers() throws Exception {
+	public void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
 
-		String url = "https://fcm.googleapis.com/fcm/send";
+		UserService userService = UserServiceFactory.getUserService();
+		User user = userService.getCurrentUser();
 
-		URL urlObj = new URL(url);
-		HttpsURLConnection con = (HttpsURLConnection)urlObj.openConnection();
+		Key gameKey = null;
 
-		con.setRequestMethod("POST");
-		con.setRequestProperty("Content-Type", "application/json");
-		con.setRequestProperty("Authorization", "key=" + AUTH_KEY);
+		HttpSession session = req.getSession();
+
+		if (user == null) {
+			resp.sendRedirect("http://battle-hex.appspot.com/index.jsp");
+		}
+
+		if (session.getMaxInactiveInterval() != 600) {
+			session.setMaxInactiveInterval(600);
+		}
+
+		if (session.getAttribute("gameKey") != null) {
+
+			BoardHelper boardHelper = new BoardHelper();
+
+			gameKey = Key.fromUrlSafe(session.getAttribute("gameKey").toString());
+			boardHelper.setGameKey(gameKey);
+
+			if (req.getParameter("fbtoken") != null) {
+				boardHelper.addGameListener((String)req.getParameter("fbtoken"));
+			}
+
+			boardHelper.notifyPlayers();
+		}
+
+		resp.setContentType("application/json");
+		resp.getWriter().println("{");
+		resp.getWriter().println("\"gameKey\" : \"" + gameKey.toUrlSafe() + "\",");
+		resp.getWriter().println("\"player1State\" : \"\",");
+		resp.getWriter().println("\"player2State\" : \"\"");
+		resp.getWriter().println("}");
+
+		resp.getWriter().close();
 	}
 }
 
