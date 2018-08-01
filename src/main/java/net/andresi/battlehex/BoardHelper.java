@@ -42,7 +42,7 @@ public class BoardHelper {
 	private Key gameKey;
 	private String appNotifierKey;
 
-	static final String AUTH_KEY = "AAAAWaB3uw0:APA91bFq04mXdoMaiLN0hNEF6KZvsdpW8UKKVGrKaVNST7sqFGDBXB4bdeQFFlwqujrROsGWGGyxmBZJ0saDh0Ou5JPdeeRntgS9pbhShN8W12d7P95Txp6aO8itTOW8y5USreaQMcVH";
+	static final String AUTH_KEY = "";
 	User user = null;
 	
 	public BoardHelper() {
