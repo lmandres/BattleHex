@@ -793,6 +793,8 @@
 				}
 			}
 
+			console.log(maxIndex, computerMoveSets[maxIndex]["row"], computerMoveSets[maxIndex]["column"], maxProbability);
+
 			returnCoords = {
 				"row": computerMoveSets[maxIndex]["row"],
 				"column": computerMoveSets[maxIndex]["column"]

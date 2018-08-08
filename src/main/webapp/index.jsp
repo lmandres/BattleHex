@@ -29,6 +29,11 @@
 				(<a id="newGameLink" href="getgame.jsp?action=1&player=1">as first player</a> /
 				<a id="newGameLink" href="getgame.jsp?action=1&player=2">as second player</a>).
 		</li>
+		<li>
+			Play against AI
+				(<a id="newGameLink" href="getgame.jsp?action=3&player=1">as first player</a> /
+				<a id="newGameLink" href="getgame.jsp?action=3&player=2">as second player</a>).
+		</li>
 		<li><a href="listgames.jsp">Join a game.</a></li>
 		<li>Resume a game.</li>
 		<li>Watch a game.</li>
