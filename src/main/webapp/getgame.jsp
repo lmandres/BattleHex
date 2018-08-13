@@ -19,9 +19,7 @@
 
 		pageContext.setAttribute("user", user, PageContext.SESSION_SCOPE);
 
-		if (pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE) != null) {
-			gameKey = Key.fromUrlSafe(pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE).toString());
-		} else if (request.getParameter("action") != null) {
+		if (request.getParameter("action") != null) {
 
 			if (request.getParameter("action").equals("1")) {
 				// New Game
@@ -60,8 +58,8 @@
 				gameKey = gameManager.getNewGame(user, player, 13, 13);
 				gameKey = gameManager.joinExistingGame(gameKey.toUrlSafe());
 
-				pageContext.setAttribute("player", player, PageContext.SESSION_SCOPE);
 				pageContext.setAttribute("gameKey", gameKey.toUrlSafe(), PageContext.SESSION_SCOPE);
+				pageContext.setAttribute("moveNumber", gameManager.createGameMove(1), PageContext.SESSION_SCOPE);
 			}
 		}
 

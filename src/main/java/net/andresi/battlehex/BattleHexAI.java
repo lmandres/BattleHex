@@ -1,776 +1,472 @@
-<%@ page language="java" contentType="text/html; charset=ISO-8859-1" pageEncoding="ISO-8859-1" %>
-<%@ page import="battlehex.BoardHelper" %>
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<!-- The HTML 4.01 Transitional DOCTYPE declaration-->
-<!-- above set at the top of the file will set     -->
-<!-- the browser's rendering engine into           -->
-<!-- "Quirks Mode". Replacing this declaration     -->
-<!-- with a "Standards Mode" doctype is supported, -->
-<!-- but may lead to some differences in layout.   -->
+package battlehex;
 
-<%
-	BoardHelper boardHelper = new BoardHelper();
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Random;
 
-	boardHelper.setImageWidth(320);
-	boardHelper.setImageHeight(550);
-	boardHelper.setBoardRows(13);
-	boardHelper.setBoardColumns(13);
-	boardHelper.setPlayer(BoardHelper.FIRST_PLAYER);
-	boardHelper.setBoardShape(BoardHelper.VERTICAL_BOARD);
+import org.apache.commons.math3.stat.StatUtils;
 
-	String cardSet = "cardstux";
-	String [][] ranks = {{"a","2","3","4"},{"5","6","7","8"},{"9","10","j","q"},{"k"}};
-	String [] suits = boardHelper.getPlayerSuits().split(",");
-%>
+public class BattleHexAI {
 
-<html>
-  <head>
-    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-    <title>Battle Hex</title>
-    <link type="text/css" rel="stylesheet" href="main.css" />
-    <link rel="shortcut icon" href="favicon.ico" />
-    <script type="text/javascript" src="numeric-1.2.6.min.js"></script>
-    <script type="text/javascript" src="math.min.js"></script>
-	<script type="text/javascript">
+	int monteCarloIterations = 0;
 	
-		let player = <%= boardHelper.getPlayer() %>;
-		let computer = (player % 2) + 1;
+	interface BoardTraverse {
+        	public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player);
+		public HashMap<String, Integer> increment(int currentRow, int currentColumn);
+    	}
 
-		let svgNS = "http://www.w3.org/2000/svg";
-		let svgID = "svgBoard";
-		
-		let indexValues = ["a", "2", "3", "4", "5", "6", "7", "8", "9", "10", "j", "q", "k"];
+    	private BoardTraverse[] boardTraversions = new BoardTraverse[] {
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentColumn < gameBoardIn.get(currentRow).size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn+1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
 
-		let playerFlipCard = null;
-		let playerPlayCard = null;
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
 
-		let computerFlipCard = null;
-		let computerPlayCard = null;
+				incrementOut.put("row", currentRow);
+				incrementOut.put("column", currentColumn+1);
 
-		let computerSuits = "<%= boardHelper.getOpponentSuits() %>".split(",");
-		let deleteLine = null;
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow < gameBoardIn.size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
 
-		let gameBoard = [];
-		let voltageBoardIndexes = [];
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
 
-		let testVoltage = 100;
-		let randomMoveLimit = 100;
-		
-		function supportsSVG() {
-			return !!document.createElementNS && !!document.createElementNS(svgNS, "svg").createSVGRect;
+				incrementOut.put("row", currentRow+1);
+				incrementOut.put("column", currentColumn);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow < gameBoardIn.size()-1) && (currentColumn > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn-1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow+1);
+				incrementOut.put("column", currentColumn-1);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentColumn > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn-1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow);
+				incrementOut.put("column", currentColumn-1);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow-1);
+				incrementOut.put("column", currentColumn);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow > 0) && (currentColumn < gameBoardIn.get(currentRow).size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn+1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow-1);
+				incrementOut.put("column", currentColumn+1);
+
+				return incrementOut;
+			}
 		}
-		
-		function getXCoord(row, column) {
-<%
-	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
-%>
-			return <%= boardHelper.getStartXCoord() %>+((column-row)*<%= boardHelper.getCellHalfWidth() %>);
-<%
-	} else if (boardHelper.getPlayer() == BoardHelper.SECOND_PLAYER) {
-%>
-			return <%= boardHelper.getStartXCoord() %>+(((<%= boardHelper.getBoardColumns()+1 %>-column)-(<%= boardHelper.getBoardRows()+1 %>-row))*<%= boardHelper.getCellHalfWidth() %>);
-<%
+	};
+
+	public void setMonteCarloIterations(int iterationsIn) {
+		monteCarloIterations = iterationsIn;
 	}
-%>
-		}
-		
-		function getYCoord(row, column) {
-<%
-	if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) {
-%>
-			return <%= boardHelper.getStartYCoord() %>+((column-row)*<%= boardHelper.getCellExtendedLength() %>)+((row-1)*<%= 2*boardHelper.getCellExtendedLength() %>);
-<%
-	} else if (boardHelper.getPlayer() == BoardHelper.SECOND_PLAYER) {
-%>
-			return <%= boardHelper.getStartYCoord() %>+(((<%= boardHelper.getBoardColumns()+1 %>-column)-(<%= boardHelper.getBoardRows()+1 %>-row))*<%= boardHelper.getCellExtendedLength() %>)+(((<%= boardHelper.getBoardRows() %>-row))*<%= 2*boardHelper.getCellExtendedLength() %>);
-<%
+
+	public int getMonteCarloIterations() {
+		return monteCarloIterations;
 	}
-%>
-		}
-		
-		function makeMove(card, playerIn) {
 
-			let gameBoardSet = true;
+	public HashMap<String, Integer> calculateComputerMove(int playerIn, ArrayList<ArrayList<Integer>> gameBoardIn) {
 
-			if (gameBoard.length != indexValues.length+2) {
-				gameBoardSet = false;
-			} else {
-				for (let rowIndex = 0; (rowIndex < indexValues.length+2) || !gameBoardSet; rowIndex++) {
-					if (gameBoard[rowIndex].length != indexValues.length+2) {
-						gameBoardSet = false;
-					}
-				}
-			}
+		double maxWeight = 0.0;
+		HashMap<String, Integer> moveOut = new HashMap<String, Integer>();
 
-			if (gameBoardSet) {
+		ArrayList<ArrayList<HashMap<String, Object>>> moveLists = new ArrayList<ArrayList<HashMap<String, Object>>>();
+		moveLists.add(normalizeAndSort(calculateMonteCarloMoves(playerIn, gameBoardIn)));
 
-				if (playerIn == player) {
-			
-					if (
-						document.getElementById(card).src != "<%= cardSet %>/back.png" &&
-						(
-							playerFlipCard == null ||
-							playerPlayCard != null ||
-							(
-								playerPlayCard == null &&
-								card.substr(0,1).toLowerCase() != playerFlipCard.substr(0,1).toLowerCase()	
-							)
-						)
-					) {
+		for (int index = 0; index < moveLists.size(); index++) {
 
-						if (playerFlipCard == null) {
-							playerFlipCard = card;
-						} else if (playerPlayCard == null) {
+			int currentRow = (Integer)moveLists.get(index).get(0).get("row");
+			int currentColumn = (Integer)moveLists.get(index).get(0).get("column");
+			double currentWeight = testMoveUsingMonteCarlo(playerIn, gameBoardIn, currentRow, currentColumn);
 
-							let playerMove = getPlayerRowColumn(playerFlipCard, card);
-
-							if (
-								playerMove["row"] &&
-								playerMove["column"] &&
-								gameBoard[playerMove["row"]][playerMove["column"]] == null
-							) {
-								playerPlayCard = card;
-							}
-			
-						} else {
-
-							let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-
-							drawHexCell(playerMove["row"], playerMove["column"]);
-
-							playerFlipCard = card;
-							playerPlayCard = null;
-						}
-
-						displayMove();
-					}
-				
-					if (
-						playerFlipCard != null &&
-						playerPlayCard != null
-					) {
-						if (document.getElementById("randomizeFlipInput").checked) {
-
-							randomizeMove(player);
-				
-							document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
-							document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
-						}
-						document.getElementById("sendMove").disabled = false;
-					} else {
-						document.getElementById("sendMove").disabled = true;
-					}
-
-				} else {
-
-					if (computerFlipCard == null) {
-						computerFlipCard = card;
-					} else if (computerPlayCard == null) {
-						computerPlayCard = card;					
-					} else {
-						computerFlipCard = card;
-						computerPlayCard = null;
-					}
-				}
-					
-
-				if ((playerPlayCard != null) || (playerFlipCard != null)) {
-					document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/back.png";
-					document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/back.png";
-				}
-			}
-		}
-		
-		function makeCellMove(row, column, playerIn) {
-
-			if (playerIn == player) {
-				if ((playerPlayCard == null) && (playerFlipCard != null)) {
-					if (deleteLine.substr(0,1) == "r") {
-						makeMove("b"+indexValues[column-1], playerIn);
-					} else if (deleteLine.substr(0,1) == "c") {
-						makeMove("r"+indexValues[row-1], playerIn);
-					}
-				}
-
-				makeMove("r"+indexValues[row-1], playerIn);
-				makeMove("b"+indexValues[column-1], playerIn);
-
-			} else {
-
-				makeMove("r"+indexValues[row-1], playerIn);
-				makeMove("b"+indexValues[column-1], playerIn);
-
-				randomizeMove(playerIn);
-			}
-		}
-		
-		function randomizeMove(playerIn) {
-
-			if (playerIn == player) {
-
-				if (playerFlipCard != null && playerPlayCard != null) {
-					if (Math.random() < 0.5) {
-						var tempCard = playerFlipCard;
-						playerFlipCard = playerPlayCard;
-						playerPlayCard = tempCard;
-					}
-				
-					document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
-					document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
-				}
-
-			} else {
-				if (Math.random() < 0.5) {
-					var tempCard = computerFlipCard;
-					computerFlipCard = computerPlayCard;
-					computerPlayCard = tempCard;
-				}
+			if (currentWeight > maxWeight) {
+				moveOut.put("row", currentRow);
+				moveOut.put("column", currentColumn);
 			}
 		}
 
-		function showMoves() {
+		return moveOut;
+	}
 
-			if (
-				playerFlipCard != null &&
-				playerPlayCard != null &&
-				computerFlipCard != null &&
-				computerPlayCard != null
-			) {
+	public double testMoveUsingMonteCarlo(int playerIn, ArrayList<ArrayList<Integer>> gameBoardIn, int rowIn, int columnIn) {
 
-				let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-				let computerMove = getPlayerRowColumn(computerFlipCard, computerPlayCard);
+		ArrayList<HashMap<String, Object>> emptyCoords = getEmptyCoords(gameBoardIn);
 
-				document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
-				document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
+		int opponent = (playerIn % 2) + 1;
+		int iterationsIndex = monteCarloIterations;
+		double winCount = 0.0;
 
-				if (playerMove["row"] == computerMove["row"] && playerMove["column"] == computerMove["column"]) {
-					tieBreaker();
-				} else {
+		while (iterationsIndex > 0) {
 
-					if (player == 1) {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "red");
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "black");
-					} else {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "black");
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "red");
-					}
+			ArrayList<ArrayList<Object>> randomBoard = randomizeBoardMoves(gameBoardIn, emptyCoords);
 
-					playerFlipCard = null;
-					playerPlayCard = null;
-					computerFlipCard = null;
-					computerPlayCard = null;
+			int test1 = 0;
+			int test2 = 0;
 
-					computerMove = calculateComputerMove(computer, gameBoard);
-					makeCellMove(computerMove["row"], computerMove["column"], computer);
-					showMoves();
+			int playerMove = (Integer)randomBoard.get(rowIn).get(columnIn);
+
+			if (evaluateWin(playerIn, randomBoard)) {
+				test1 = playerIn;
+			} else if (evaluateWin(opponent, randomBoard)) {
+				test1 = opponent;
+			}
+
+			playerMove = (playerMove % 2) + 1;
+			randomBoard.get(rowIn).set(columnIn, playerMove);
+
+			if (evaluateWin(playerIn, randomBoard)) {
+				test2 = playerIn;
+			} else if (evaluateWin(opponent, randomBoard)) {
+				test2 = opponent;
+			}
+
+			if (test1 != test2) {
+				winCount += 1;
+			}
+
+			iterationsIndex--;
+		}
+
+		return winCount / (double)monteCarloIterations;
+	}
+
+	public ArrayList<HashMap<String, Object>> calculateMonteCarloMoves(int playerIn, ArrayList<ArrayList<Integer>> gameBoardIn) {
+
+		ArrayList<HashMap<String, Object>> emptyCoords = getEmptyCoords(gameBoardIn);
+
+		int opponent = (playerIn % 2) + 1;
+
+		int iterationsIndex = monteCarloIterations;
+
+		while (iterationsIndex > 0) {
+
+			ArrayList<ArrayList<Object>> randomBoard = randomizeBoardMoves(gameBoardIn, emptyCoords);
+
+			for (int coordIndex = 0; coordIndex < emptyCoords.size(); coordIndex++) {
+
+				int test1 = 0;
+				int test2 = 0;
+
+				int playerMove = (Integer)randomBoard.get(
+					(Integer)emptyCoords.get(coordIndex).get("row")
+				).get(
+					(Integer)emptyCoords.get(coordIndex).get("column")
+				);
+
+				if (evaluateWin(playerIn, randomBoard)) {
+					test1 = playerIn;
+				} else if (evaluateWin(opponent, randomBoard)) {
+					test1 = opponent;
 				}
 
-			} else {
+				playerMove = (playerMove % 2) + 1;
+				randomBoard.get(
+					(Integer)emptyCoords.get(coordIndex).get("row")
+				).set(
+					(Integer)emptyCoords.get(coordIndex).get("column"),
+					playerMove
+				);
 
-				let playerCount = 0;
-				let computerCount = 0;
-
-				for (let rowIndex = 1; rowIndex <= indexValues.length; rowIndex++) {
-					for (let columnIndex = 1; columnIndex <= indexValues.length; columnIndex++) {
-						if (gameBoard[rowIndex][columnIndex] == player) {
-							playerCount++;
-						} else if (gameBoard[rowIndex][columnIndex] == computer) {
-							computerCount++;
-						}
-					}
+				if (evaluateWin(playerIn, randomBoard)) {
+					test2 = playerIn;
+				} else if (evaluateWin(opponent, randomBoard)) {
+					test2 = opponent;
 				}
 
+				if (test1 != test2) {
+					double weight = (Double)emptyCoords.get(coordIndex).get("weight");
+					weight += 1;
+					emptyCoords.get(coordIndex).put("weight", weight);
+				}
+			}
+
+			iterationsIndex--;
+		}
+
+		return emptyCoords;	
+	}
+
+	public ArrayList<HashMap<String, Object>> normalizeAndSort(ArrayList<HashMap<String, Object>> valuesMapList) {
+
+		Comparator<HashMap<String, Object>> mapComparator = new Comparator<HashMap<String, Object>>() {
+			public int compare(HashMap<String, Object> m1, HashMap<String, Object> m2) {
+				return ((Double)m2.get("normalweight")).compareTo(((Double)m1.get("normalweight")));
+			}
+		};
+
+		ArrayList<HashMap<String, Object>> normalizedList = valuesMapList;
+		double[] weights = new double[normalizedList.size()];
+
+		for (int index = 0; index < normalizedList.size(); index++) {
+			weights[index] = (Double)normalizedList.get(index).get("weight");
+		}
+		weights = StatUtils.normalize(weights);
+		for (int index = 0; index < normalizedList.size(); index++) {
+			normalizedList.get(index).put("normalweight", weights[index]);
+		}
+
+		Collections.sort(normalizedList, mapComparator);
+
+		return normalizedList;
+	}
+
+	private ArrayList<HashMap<String, Object>> getEmptyCoords(ArrayList<ArrayList<Integer>> gameBoardIn) {
+
+		ArrayList<HashMap<String, Object>> emptyCoords = new ArrayList<HashMap<String, Object>>();
+
+		for (int rowIndex = 1; rowIndex <= gameBoardIn.size()-1; rowIndex++) {
+			for (int columnIndex = 1; columnIndex <= gameBoardIn.get(rowIndex).size()-1; columnIndex++) {
+				if (gameBoardIn.get(rowIndex).get(columnIndex) == 0) {
+					HashMap<String, Object> emptyCoord = new HashMap<String, Object>();
+					emptyCoord.put("row", rowIndex);
+					emptyCoord.put("column", columnIndex);
+					emptyCoord.put("weight", (Double)0.0);
+					emptyCoords.add(emptyCoord);
+				}
+			}
+		}
+
+		return emptyCoords;
+	}
+
+	private ArrayList<ArrayList<Object>> randomizeBoardMoves(ArrayList<ArrayList<Integer>> gameBoardIn, ArrayList<HashMap<String, Object>> emptyCoordsIn) {
+
+		Random rand = new Random();
+
+		ArrayList<ArrayList<Object>> randomBoard = new ArrayList<ArrayList<Object>>();
+		Integer randomPlayer = rand.nextInt(2) + 1;
+		ArrayList<HashMap<String, Object>> populateCoords = new ArrayList<HashMap<String, Object>>();
+
+	 	for (int copyIndex1 = 0; copyIndex1 < gameBoardIn.size(); copyIndex1++) {
+
+			ArrayList<Object> boardRow = new ArrayList<Object>();
+
+			for (int copyIndex2 = 0; copyIndex2 < gameBoardIn.get(copyIndex1).size(); copyIndex2++) {
+				boardRow.add(gameBoardIn.get(copyIndex1).get(copyIndex2));
+			}
+
+			randomBoard.add(boardRow);
+	 	}
+	
+		for (int copyIndex = 0; copyIndex < emptyCoordsIn.size(); copyIndex++) {
+
+			HashMap<String, Object> emptyCoord = new HashMap<String, Object>();
+			int row = (Integer)emptyCoordsIn.get(copyIndex).get("row");
+			int column = (Integer)emptyCoordsIn.get(copyIndex).get("column");
+
+			emptyCoord.put("row", row);
+			emptyCoord.put("column", column);
+			populateCoords.add(emptyCoord);
+		}
+
+		for (int moveIndex = populateCoords.size(); moveIndex > 0; moveIndex--) {
+
+			int randomMoveIndex = rand.nextInt(moveIndex);
+
+			randomBoard.get(
+				(Integer)populateCoords.get(randomMoveIndex).get("row")
+			).set(
+				(Integer)populateCoords.get(randomMoveIndex).get("column"),
+				randomPlayer
+			);
+
+			populateCoords.remove(randomMoveIndex);
+			randomPlayer = (randomPlayer % 2) + 1;
+		}
+
+		return randomBoard;
+	}
+
+	public ArrayList<ArrayList<Integer>> convertBoardArraysToLists(int[][] gameBoardIn) {
+
+		ArrayList<ArrayList<Integer>> gameBoardOut = new ArrayList<ArrayList<Integer>>();
+
+		for (int rowIndex = 0; rowIndex < gameBoardIn.length; rowIndex++) {
+			ArrayList<Integer> intObjList = new ArrayList<Integer>();
+			for (int columnIndex = 0; columnIndex < gameBoardIn[rowIndex].length; columnIndex++) {
+				intObjList.add(gameBoardIn[rowIndex][columnIndex]);
+			}
+			gameBoardOut.add(intObjList);
+		}
+
+		return gameBoardOut;
+	}
+
+	public int[][] convertBoardListsToArrays(ArrayList<ArrayList<Integer>> gameBoardIn) {
+
+		int[][] gameBoardOut = new int[gameBoardIn.size()][];
+
+		for (int rowIndex = 0; rowIndex < gameBoardIn.size(); rowIndex++) {
+			gameBoardOut[rowIndex] = new int[gameBoardIn.get(rowIndex).size()];
+			for (int columnIndex = 0; columnIndex < gameBoardIn.get(rowIndex).size(); columnIndex++) {
+				gameBoardOut[rowIndex][columnIndex] = gameBoardIn.get(rowIndex).get(columnIndex);
+			}
+		}
+
+		return gameBoardOut;
+	}
+
+    	public boolean evaluateWin(int playerIn, ArrayList<ArrayList<Object>> gameBoardIn) {
+
+		int startIndex = 0;
+		int currentRow = 0;
+		int currentColumn = 0;
+
+		if (playerIn == 1) {
+			while (true) {
 				if (
-					(playerCount < computerCount) &&
-					playerFlipCard != null &&
-					playerPlayCard != null
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
 				) {
-
-					let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-
-					if (computerFlipCard.substr(0, 1) == "r") {
-						makeMove("r" + indexValues[playerMove["row"]-1], player);
-						makeMove("b" + indexValues[playerMove["column"]-1], player);
-					} else {
-						makeMove("b" + indexValues[playerMove["column"]-1], player);
-						makeMove("r" + indexValues[playerMove["row"]-1], player);
-					}
-
-					if (player == 1) {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "red");
-					} else {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "black");
-					}
-
-					playerFlipCard = null;
-					playerPlayCard = null;
-					computerFlipCard = null;
-					computerPlayCard = null;
-
-					computerMove = calculateComputerMove(computer, gameBoard);
-					makeCellMove(computerMove["row"], computerMove["column"], computer);
-					showMoves();
-				}
-			}
-
-			if (evaluateWin(player, gameBoard)) {
-				alert("Player wins!");
-			} else if (evaluateWin(computer, gameBoard)) {
-				alert("Computer wins!");
-			}
-		}
-
-		function tieBreaker() {
-
-			if (
-				playerFlipCard != null &&
-				playerPlayCard != null &&
-				computerFlipCard != null &&
-				computerPlayCard != null
-			) {
-
-				let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-
-				if (playerFlipCard == computerFlipCard) {
-
-					if (player == 1) {
-
-						alert("Both move to \"" + playerFlipCard + "\", \"" + playerPlayCard + ".\"  Player wins move.");
-
-						let computerMove = {};
-
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "red");
-
-						computerMove = calculateComputerMove(computer, gameBoard);
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "black");
-
-						if (playerFlipCard.substr(0, 1) == "r") {
-							makeMove("r" + indexValues[computerMove["row"]-1], computer);
-							makeMove("b" + indexValues[computerMove["column"]-1], computer);
-						} else {
-							makeMove("b" + indexValues[computerMove["column"]-1], computer);
-							makeMove("r" + indexValues[computerMove["row"]-1], computer);
-						}
-
-						playerFlipCard = null;
-						playerPlayCard = null;
-
-						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
-						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
-
-						computerMove = calculateComputerMove(computer, gameBoard);
-						makeCellMove(computerMove["row"], computerMove["column"], computer);
-
-					} else {
-
-						alert("Both move to \"" + computerFlipCard + "\", \"" + computerPlayCard + ".\"  Computer wins move.");
-
-						let computerMove = getPlayerRowColumn(computerFlipCard, computerPlayCard);
-
-						playerFlipCard = null;
-						playerPlayCard = null;
-
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "red");
-					}
-					
+					startIndex = ((startIndex+1) % 6);
+					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
+					currentRow = (Integer)coordMap.get("row");
+					currentColumn = (Integer)coordMap.get("column");
+					startIndex = ((startIndex+4) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
 				} else {
-
-					if (player == 2) {
-
-						alert("Both move to \"" + playerFlipCard + "\", \"" + playerPlayCard + ".\"  Player wins move.");
-
-						let computerMove = {};
-
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexPiece(playerMove["row"], playerMove["column"], "black");
-
-						computerMove = calculateComputerMove(computer, gameBoard);
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "red");
-
-						if (playerFlipCard.substr(0, 1) == "r") {
-							makeMove("r" + indexValues[computerMove["row"]-1], computer);
-							makeMove("b" + indexValues[computerMove["column"]-1], computer);
-						} else {
-							makeMove("b" + indexValues[computerMove["column"]-1], computer);
-							makeMove("r" + indexValues[computerMove["row"]-1], computer);
-						}
-
-						playerFlipCard = null;
-						playerPlayCard = null;
-
-						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerFlipCard.substr(0, 1))] + computerFlipCard.substr(1) + ".png";
-						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + computerSuits["b,r".split(",").indexOf(computerPlayCard.substr(0, 1))] + computerPlayCard.substr(1) + ".png";
-
-						computerMove = calculateComputerMove(computer, gameBoard);
-						makeCellMove(computerMove["row"], computerMove["column"], computer)
-;
-					} else {
-
-						alert("Both move to \"" + computerFlipCard + "\", \"" + computerPlayCard + ".\"  Computer wins move.");
-
-						let computerMove = getPlayerRowColumn(computerFlipCard, computerPlayCard);
-
-						playerFlipCard = null;
-						playerPlayCard = null;
-
-						gameBoard[computerMove["row"]][computerMove["column"]] = computer;
-						drawHexPiece(computerMove["row"], computerMove["column"], "black");
-					}
+					startIndex = ((startIndex+1) % 6);
+				}
+				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
+					break;
 				}
 			}
-		}
-
-		function evaluateWin(playerIn, gameBoardIn) {
-
-			let traverseFunctions = [
-				function() {
-					if ((currentColumn < indexValues.length+1)) {
-						if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow][currentColumn+1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentRow < indexValues.length+1) { 
-						if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow+1][currentColumn]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if ((currentRow < indexValues.length+1) && (currentColumn > 0)) {
-						if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow+1][currentColumn-1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentColumn > 0) {
-						if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow][currentColumn-1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentRow > 0) {
-						if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow-1][currentColumn]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if ((currentRow > 0) && (currentColumn < indexValues.length+1)) {
-	 					if ([0, 3, playerIn].indexOf(gameBoardIn[currentRow-1][currentColumn+1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				}
-			];
-
-			let incrementFunctions = [
-				function() {
-					currentColumn++;
-				},
-				function() {
-					currentRow++;
-				},
-				function() {
-					currentRow++;
-					currentColumn--;
-				},
-				function() {
-					currentColumn--;
-				},
-				function() {
-					currentRow--;
-				},
-				function() {
-	 				currentRow--;
-					currentColumn++;
-				}
-			];
-
-			let lastIndex = null;
-			let startIndex = null;
-
-			let currentRow = null;
-			let currentColumn = null;
-
-			if (playerIn == 1) {
-				startIndex = 0;
-				currentRow = 0;
-				currentColumn = 0;
-			} else if (playerIn == 2) {
-				startIndex = 0;
-				currentRow = 0;
-				currentColumn = 0;
-			}
-
-			if (playerIn == 1) {
-				while (true) {
-					if (!traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-						incrementFunctions[startIndex]();
-						startIndex = ((startIndex+4) % 6);
-					} else if (traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else if (traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else if (!traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else {
-						startIndex = ((startIndex+1) % 6);
-					}
-					if (gameBoardIn[currentRow][currentColumn] == 0) {
-						break;
-					}
-				}
-			} else if (playerIn == 2) {
-				while (true) {
-					if (traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						incrementFunctions[startIndex]();
-					} else if (!traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else if (traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else if (!traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else {
-						startIndex = ((startIndex+5) % 6);
-					}
-					if (gameBoardIn[currentRow][currentColumn] == 0) {
-						break;
-					}
-				}
-			}
-
-			if ((playerIn == 1) && (currentColumn >= indexValues.length+1)) {
-				return true;
-			} else if ((playerIn == 2) && (currentRow >= indexValues.length+1)) {
-				return true;
-			}
-
-			return false;
-		}
-
-		function sendPlayerMove() {
-			showMoves();
-		}
-		
-		function drawHexPiece(row, column, color) {
-			drawSVGPiece(row, column, color);
-		}
-		
-		function drawHexCell(row, column) {
-			drawSVGCell(row, column);
-		}
-
-		function getPlayerRowColumn(playerFlipCardIn, playerPlayCardIn) {
-
-			let playerMove = {
-				"row" : null,
-				"column" : null
-			}
-
-			if (playerFlipCardIn) {
-				if ("br".indexOf(playerFlipCardIn.substr(0,1).toLowerCase()) == 1) {
-					playerMove["row"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
+		} else if (playerIn == 2) {
+			while (true) {
+				if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
+					currentRow = (Integer)coordMap.get("row");
+					currentColumn = (Integer)coordMap.get("column");
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
 				} else {
-					playerMove["column"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
+					startIndex = ((startIndex+5) % 6);
+				}
+				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
+					break;
 				}
 			}
-
-			if (playerPlayCardIn) {
-				if ("br".indexOf(playerPlayCardIn.substr(0,1).toLowerCase()) == 1) {
-					playerMove["row"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
-				} else {
-					playerMove["column"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
-				}
-			}
-
-			return playerMove;
-		}
-		
-		function displayMove() {
-
-			let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-			
-			if (playerPlayCard == null) {
-				
-				document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
-				document.getElementById("playerPlayCardImg").src = "<%= cardSet %>/blank.png";
-				
-				for (let cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
-					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/back.png";
-				}
-				
-			} else {
-				
-				document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
-				
-				for (let cardIndex = 0; cardIndex < indexValues.length; cardIndex++) {
-					document.getElementById(playerFlipCard.substr(0,1).toLowerCase()+indexValues[cardIndex]).src = "<%= cardSet %>/"+"<%= boardHelper.getPlayerSuits() %>".substr("b,r".indexOf(playerFlipCard.substr(0,1).toLowerCase()),1)+indexValues[cardIndex]+".png";
-				}
-			}
-				
-			if (playerFlipCard != null && playerPlayCard == null) {
-					
-				if (playerMove["row"] != null) {
-					deleteLine = "r"+playerMove["row"];
-					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
-						if (gameBoard[playerMove["row"]][lineIndex] == null) {
-							drawHexPiece(playerMove["row"], lineIndex, "cyan");
-						}
-					}
-				} else if (playerMove["column"] != null) {
-					deleteLine = "c"+playerMove["column"];
-					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
-						if (gameBoard[lineIndex][playerMove["column"]] == null) {
-							drawHexPiece(lineIndex, playerMove["column"], "cyan");
-						}
-					}
-				}
-					
-			} else if (playerFlipCard != null && playerPlayCard != null) {
-				
-				document.getElementById("playerFlipCardImg").src = document.getElementById(playerFlipCard).src;
-				document.getElementById("playerPlayCardImg").src = document.getElementById(playerPlayCard).src;
-
-				for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
-					if (deleteLine.substr(0,1) == "r") {
-						if (gameBoard[deleteLine.substr(1,deleteLine.length-1)][lineIndex] == null) {
-							drawHexCell(deleteLine.substr(1,deleteLine.length-1), lineIndex);
-						}
-					} else if (deleteLine.substr(0,1) == "c") {
-						if (gameBoard[lineIndex][deleteLine.substr(1,deleteLine.length-1)] == null) {
-							drawHexCell(lineIndex, deleteLine.substr(1,deleteLine.length-1));
-						}
-					}
-				}
-
-				drawHexPiece(playerMove["row"], playerMove["column"], "cyan");
-			}
-		}
-		
-		function svgHexCell(row, column) {
-		
-			let hexObj = document.createElementNS(svgNS, "polygon");
-			let pointsStr = "";
-			
-			let xCoord = getXCoord(row, column);
-			let yCoord = getYCoord(row, column);
-			
-			<%
-				for (int pointIndex = 0; pointIndex < 6; pointIndex++) {
-					
-					if (pointIndex != 0) {
-						out.println("\t\t\tpointsStr += \" \"");
-					}
-					
-					out.print("\t\t\tpointsStr += (xCoord+("+String.format("%.15f", boardHelper.getPointXDelta(pointIndex))+"))+\",\"+");
-					out.println("(yCoord+("+String.format("%.15f", (-1)*boardHelper.getPointYDelta(pointIndex))+"));");
-				}
-			%>
-		
-			hexObj.setAttribute("points", pointsStr);
-			hexObj.setAttribute("onclick", "makeCellMove("+row+","+column+",player);");
-			
-			hexObj.style.fill="white";
-			hexObj.style.stroke="black";
-		
-			return hexObj;
-		}
-		
-		function svgHexPiece(row, column, color) {
-			
-			let pieceObj = document.createElementNS(svgNS, "circle");
-			
-			pieceObj.setAttribute("cx", getXCoord(row, column));
-			pieceObj.setAttribute("cy", getYCoord(row, column));
-			pieceObj.setAttribute("r", <%= boardHelper.getPieceRadius() %>);
-			pieceObj.setAttribute("stroke", "black");
-			pieceObj.setAttribute("fill", color);
-			
-			return pieceObj;
-		}
-		
-		function drawSVGPiece(row, column, color) {
-			let svgObj = document.getElementById(svgID);
-			svgObj.appendChild(svgHexPiece(row, column, color));
-		}
-		
-		function drawSVGCell(row, column) {
-			let svgObj = document.getElementById(svgID);
-			svgObj.appendChild(svgHexCell(row, column));
 		}
 
-		function startGame() {
-
-			voltageBoardIndexes = null;
-
-			gameBoard = [];
-			voltageBoardIndexes = [];
-
-			let voltageIndex = 0;
-			let computerMove = null;
-
-			document.getElementById("playerPlayCardImg").src = "<%= cardSet %>/blank.png";
-			document.getElementById("playerFlipCardImg").src = "<%= cardSet %>/blank.png";
-			document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/blank.png";
-			document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/blank.png";
-
-			for (let rowIndex = 0; rowIndex <= indexValues.length+1; rowIndex++) {
-				gameBoard.push([]);
-				voltageBoardIndexes.push([]);
-				for (let columnIndex = 0; columnIndex <= indexValues.length+1; columnIndex++) {
-					if (
-						(rowIndex == 0 && columnIndex == indexValues.length+1) ||
-						(rowIndex == indexValues.length+1 && columnIndex == 0)
-					) {
-						gameBoard[rowIndex].push(0);
-					} else if (
-						(rowIndex == 0 && columnIndex == 0) ||
-						(rowIndex == indexValues.length+1 && columnIndex == indexValues.length+1)
-					) {
-						gameBoard[rowIndex].push(0);
-					} else if (rowIndex == 0 || rowIndex == indexValues.length+1) {
-						gameBoard[rowIndex].push(2);
-					} else if (columnIndex == 0 || columnIndex == indexValues.length+1) {
-						gameBoard[rowIndex].push(1);
-					} else {
-						gameBoard[rowIndex].push(null);
-						drawHexCell(rowIndex, columnIndex);
-					}
-					voltageBoardIndexes[rowIndex].push(voltageIndex++);
-				}
-			}
-
-			playerFlipCard = null;
-			playerPlayCard = null;
-			computerFlipCard = null;
-			computerPlayCard = null;
-
-			computerMove = calculateComputerMove(computer, gameBoard);
-			makeCellMove(computerMove["row"], computerMove["column"], computer);
-			showMoves();
+		if ((playerIn == 1) && (currentColumn >= gameBoardIn.get(currentRow).size()-1)) {
+			return true;
+		} else if ((playerIn == 2) && (currentRow >= gameBoardIn.size()-1)) {
+			return true;
 		}
 
+		return false;
+	}
+
+
+/*
 		function calculateComputerMove(playerIn, gameBoardIn) {
 
 			let maxProbability = 0;
@@ -1599,185 +1295,6 @@
 
 			return defensiveMoves;
 		}
+*/
 
-	</script>
-  </head>
-
-  <body onload="startGame();">
-  	<table align="center" style="background-color: #004400;">
-  		<tr>
-  			<td>
-				<svg
-					id="svgBoard"
-					xmlns="http://www.w3.org/2000/svg"
-					xmlns:xlink="http://www.w3.org/1999/xlink"
-					version="1.1"
-					width="<%= boardHelper.getImageWidth() %>"
-					height="<%= boardHelper.getImageHeight() %>"
-					style="background: #004400;">
-						<polygon
-							points="
-								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord()+boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord()+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
-							style="fill: red; stroke: black;" />
-						<polygon
-							points="
-								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()-boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord()-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
-							style="fill: red; stroke: black;" />
-						<polygon
-							points="
-								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()-boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getStartXCoord()+boardHelper.getBorderObtuseXCoord()+boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
-							style="fill: black; stroke: black;" />
-						<polygon
-							points="
-								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord() %>
-								<%= boardHelper.getStartXCoord() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderAcuteYCoord()+boardHelper.getAcuteBorderLength() %>
-								<%= boardHelper.getStartXCoord()-boardHelper.getBorderObtuseXCoord()-boardHelper.getObtuseBorderLength() %>,<%= boardHelper.getStartYCoord()+boardHelper.getBorderObtuseYCoord() %>"
-							style="fill: black; stroke: black;" />
-<%
-	for (int i=1; i <= boardHelper.getBoardRows(); i++) {
-%>
-						<text
-							x="<%= boardHelper.getCellXCoord(i, 0) %>"
-							y="<%= boardHelper.getCellYCoord(i, 0) %>"
-							text-anchor="middle"
-							dominant-baseline="middle"
-							fill="black"
-							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= boardHelper.getBoardLabel(i) %></text>
-						<text
-							x="<%= boardHelper.getCellXCoord(i, 14) %>"
-							y="<%= boardHelper.getCellYCoord(i, 14) %>"
-							text-anchor="middle"
-							dominant-baseline="middle"
-							fill="black"
-							style="font-size:9; font-family: verdana; font-weight: bold;">R<%= boardHelper.getBoardLabel(i) %></text>
-<%
-	}
-%>
-
-<%
-	for (int i=1; i <= boardHelper.getBoardColumns(); i++) {
-%>
-						<text
-							x="<%= boardHelper.getCellXCoord(0, i) %>"
-							y="<%= boardHelper.getCellYCoord(0, i) %>"
-							text-anchor="middle"
-							dominant-baseline="middle"
-							fill="white"
-							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= boardHelper.getBoardLabel(i) %></text>
-						<text
-							x="<%= boardHelper.getCellXCoord(14, i) %>"
-							y="<%= boardHelper.getCellYCoord(14, i) %>"
-							text-anchor="middle"
-							dominant-baseline="middle"
-							fill="white"
-							style="font-size:9; font-family: verdana; font-weight: bold;">B<%= boardHelper.getBoardLabel(i) %></text>
-<%
-	}
-%>
-
-<%
-	for (int i=1; i <= boardHelper.getBoardRows(); i++) {
-		for (int j=1; j <= boardHelper.getBoardColumns(); j++) {
-%>
-						<polygon
-							points="
-<%
-			for (int k=0; k < 6; k++) {
-%>
-								<%= boardHelper.getPointXCoord(boardHelper.getCellXCoord(i, j), k) %>,<%= boardHelper.getPointYCoord(boardHelper.getCellYCoord(i, j), k) %>
-<%
-			}
-%>
-							"
-							onclick="makeCellMove(<%= i %>, <%= j %>, player);"
-							style="stroke: black; fill: white;"
-							/>
-<%
-		}
-	}
-%>
-				</svg>
-  			</td>
-  			<td style="text-align: center;">
-  			<table>
-  				
-  				<tr>
-  					<td style="text-align: right;">
-		  				<% if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) { %>Opposite<% } else { %>Same<% } %>
-		  			</td>
-		  			<td colspan="2">
-						<img id="opponentFlipCardImg" src="<%= cardSet %>/blank.png" width="54" height="72">
-						<img id="opponentPlayCardImg" src="<%= cardSet %>/blank.png" width="54" height="72"><br />
-  			  		</td>
-  			  		<td></td>
-  			  	<tr>
-  			  		<td style="text-align: right;">	
-		  				<% if (boardHelper.getPlayer() == BoardHelper.FIRST_PLAYER) { %>Same<% } else { %>Opposite<% } %>
-		  			</td>
-		  			<td colspan="2">
-						<img id="playerFlipCardImg" src="<%= cardSet %>/blank.png" width="54" height="72">
-						<img id="playerPlayCardImg" src="<%= cardSet %>/blank.png" width="54" height="72"><br />
-  					</td>
-  					<td>
-						<a style="color: white;" href="http://www.thegamecrafter.com/games/battle-hex">Link to instructions.</a><br />
-  						<input id="newGame" type="button" value="New Game" onclick="startGame();" /><br />
-  						<input id="sendMove" type="button" value="Send Move" disabled="disabled" onclick="sendPlayerMove();" /><br />
-  						<input id="randomizeFlipInput" type="checkbox" /> Randomize Flip
-  					</td>
-  					<tr>
-		  				<td colspan="2" style="text-align: center;">Black</td>
-  						<td colspan="2" style="text-align: center;">Red</td>
-  					</tr>
-	  				
-<%
-	for (int i=0; i < ranks.length; i++) {
-%>
-						<tr>
-<%
-		for (int j=0; j < suits.length; j++) {
-%>
-			  				<td colspan="2" style="text-align: center;">
-<%
-
-			String suit = suits[j];
-			String line = "";
-
-			if (suit.equals("c") || suit.equals("s")) {
-				line = "b";
-			} else if (suit.equals("d") || suit.equals("h")) {
-				line = "r";
-			}
-
-			for (int k=0; k < ranks[i].length; k++) {
-				String rank = ranks[i][k];
-%>
-		  				
-		  						<img id="<%= line %><%= rank %>" src="<%= cardSet %>/<%= suit %><%= rank %>.png" width="54" height="72" onclick="makeMove('<%= line %><%= rank %>', player);">
-<%
-			}
-%>
-							</td>
-<%
-		}
-%>
-						</tr>
-<%
-	}
-%>
-  				
-  			</table>
-  			</td>
-  		</tr>
-  	</table>
-  </body>
-</html>
+}

@@ -20,7 +20,7 @@
 	if (user != null) {
 		pageContext.setAttribute("user", user, PageContext.SESSION_SCOPE);
 	} else {
-		response.sendRedirect("http://battle-hex.appspot.com/index.jsp");
+		response.sendRedirect("index.jsp");
 	}
 
 	BoardHelper boardHelper = new BoardHelper();
@@ -32,19 +32,16 @@
 	boardHelper.setPlayer(BoardHelper.FIRST_PLAYER);
 
 	if (
-		pageContext.getAttribute("player", PageContext.SESSION_SCOPE) != null &&
-		pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE) != null
+		pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE) == null ||
+		pageContext.getAttribute("moveNumber", PageContext.SESSION_SCOPE) == null
 	) {
-		gameManager.setPlayer((int)pageContext.getAttribute("player", PageContext.SESSION_SCOPE));
-		gameManager.setGameKeyUrlSafe((String)pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE));
-	} else {
 		response.sendRedirect("index.jsp");
 	}
+	gameManager.setGameKeyUrlSafe((String)pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE));
+	boardHelper.setPlayer(gameManager.getPlayer(user));
 
 	boardHelper.setBoardRows(gameManager.getBoardRows());
 	boardHelper.setBoardColumns(gameManager.getBoardColumns());
-
-	pageContext.setAttribute("player", boardHelper.getPlayer(), PageContext.SESSION_SCOPE);
 
 	String cardSet = "cardstux";
 	String [][] ranks = {{"a","2","3","4"},{"5","6","7","8"},{"9","10","j","q"},{"k"}};
@@ -66,6 +63,7 @@
 		let svgID = "svgBoard";
 		
 		let indexValues = ["a", "2", "3", "4", "5", "6", "7", "8", "9", "10", "j", "q", "k"];
+		let moveNumber = <%= pageContext.getAttribute("moveNumber", PageContext.SESSION_SCOPE) %>;
 
 		let playerFlipCard = null;
 		let playerPlayCard = null;
@@ -157,8 +155,9 @@
 						} else {
 
 							let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
-
-							drawHexCell(playerMove["row"], playerMove["column"], "makeCellMove("+playerMove["row"]+","+playerMove["column"]+",player);");
+							if (playerMove["row"] != null && playerMove["column"] != null) {
+								drawHexCell(playerMove["row"], playerMove["column"], "makeCellMove("+playerMove["row"]+","+playerMove["column"]+",player);");
+							}
 
 							playerFlipCard = card;
 							playerPlayCard = null;
@@ -252,6 +251,20 @@
 			}
 		}
 
+		function drawBoardPieces() {
+			for (let rowIndex = 1; rowIndex <= indexValues.length; rowIndex++) {
+				for (let columnIndex = 1; columnIndex <= indexValues.length; columnIndex++) {
+					if (gameBoard[rowIndex][columnIndex] == 1) {
+						drawHexPiece(rowIndex, columnIndex, "red");
+					} else if (gameBoard[rowIndex][columnIndex] == 2) {
+						drawHexPiece(rowIndex, columnIndex, "black");
+					} else {
+						drawHexCell(rowIndex, columnIndex, "makeCellMove("+rowIndex+","+columnIndex+",player);");
+					}
+				}
+			}
+		}
+
 		function showMoves() {
 
 			if (
@@ -264,38 +277,34 @@
 				let playerMove = getPlayerRowColumn(playerFlipCard, playerPlayCard);
 				let opponentMove = getPlayerRowColumn(opponentFlipCard, opponentPlayCard);
 
-				document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentFlipCard.substr(0, 1))] + opponentFlipCard.substr(1) + ".png";
-				document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentPlayCard.substr(0, 1))] + opponentPlayCard.substr(1) + ".png";
+				if (opponentMove["row"] != null && opponentMove["column"] != null) {
+					document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentFlipCard.substr(0, 1))] + opponentFlipCard.substr(1) + ".png";
+					document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentPlayCard.substr(0, 1))] + opponentPlayCard.substr(1) + ".png";
+				}
 
-				if (playerMove["row"] == opponentMove["row"] && playerMove["column"] == opponentMove["column"]) {
+				if (
+					playerMove["row"] == opponentMove["row"] &&
+					playerMove["column"] == opponentMove["column"]
+				) {
 					tieBreaker();
 				} else {
 
-					if (player == 1) {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexCell(playerMove["row"], playerMove["column"], null);
-						drawHexPiece(playerMove["row"], playerMove["column"], "red");
-						gameBoard[opponentMove["row"]][opponentMove["column"]] = opponent;
-						drawHexCell(opponentMove["row"], opponentMove["column"], null);
-						drawHexPiece(opponentMove["row"], opponentMove["column"], "black");
-					} else {
-						gameBoard[playerMove["row"]][playerMove["column"]] = player;
-						drawHexCell(playerMove["row"], playerMove["column"], null);
-						drawHexPiece(playerMove["row"], playerMove["column"], "black");
-						gameBoard[opponentMove["row"]][opponentMove["column"]] = opponent;
-						drawHexCell(opponentMove["row"], opponentMove["column"], null);
-						drawHexPiece(opponentMove["row"], opponentMove["column"], "red");
-					}
+					loadGameBoard();
 
 					playerFlipCard = null;
 					playerPlayCard = null;
 					opponentFlipCard = null;
 					opponentPlayCard = null;
 
-					loadGameBoard();
-
-					opponentMove = calculateComputerMove(opponent, gameBoard);
-					makeCellMove(opponentMove["row"], opponentMove["column"], opponent);
+					getServerMoveStatus(moveNumber)
+					.then(
+						function(data) {
+							if (data["status"].toUpperCase() == "READY") {
+								document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/back.png";
+								document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/back.png";
+							}
+						}
+					);
 				}
 
 			} else {
@@ -342,10 +351,15 @@
 					opponentFlipCard = null;
 					opponentPlayCard = null;
 
-					loadGameBoard();
-
-					opponentMove = calculateComputerMove(opponent, gameBoard);
-					makeCellMove(opponentMove["row"], opponentMove["column"], opponent);
+					getServerMoveStatus(moveNumber)
+					.then(
+						function(data) {
+							if (data["status"].toUpperCase() == "READY") {
+								document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/back.png";
+								document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/back.png";
+							}
+						}
+					);
 				}
 			}
 
@@ -378,26 +392,23 @@
 						gameBoard[playerMove["row"]][playerMove["column"]] = player;
 						drawHexPiece(playerMove["row"], playerMove["column"], "red");
 
-						opponentMove = calculateComputerMove(opponent, gameBoard);
-						gameBoard[opponentMove["row"]][opponentMove["column"]] = opponent;
-						drawHexPiece(opponentMove["row"], opponentMove["column"], "black");
-
-						if (playerFlipCard.substr(0, 1) == "r") {
-							makeMove("r" + indexValues[opponentMove["row"]-1], opponent);
-							makeMove("b" + indexValues[opponentMove["column"]-1], opponent);
-						} else {
-							makeMove("b" + indexValues[opponentMove["column"]-1], opponent);
-							makeMove("r" + indexValues[opponentMove["row"]-1], opponent);
-						}
+						requestServerMove()
+						.then(
+							function(data) {
+								moveNumber = data["nextMoveNumber"];
+								playerFlipCard = data["playerFlipCard"];
+								playerPlayCard = data["playerPlayCard"];
+								opponentFlipCard = data["opponentFlipCard"];
+								opponentPlayCard = data["opponentPlayCard"];
+								loadGameBoard();
+							}
+						);
 
 						playerFlipCard = null;
 						playerPlayCard = null;
 
 						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentFlipCard.substr(0, 1))] + opponentFlipCard.substr(1) + ".png";
 						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentPlayCard.substr(0, 1))] + opponentPlayCard.substr(1) + ".png";
-
-						opponentMove = calculateComputerMove(opponent, gameBoard);
-						makeCellMove(opponentMove["row"], opponentMove["column"], opponent);
 
 					} else {
 
@@ -423,17 +434,17 @@
 						gameBoard[playerMove["row"]][playerMove["column"]] = player;
 						drawHexPiece(playerMove["row"], playerMove["column"], "black");
 
-						opponentMove = calculateComputerMove(opponent, gameBoard);
-						gameBoard[opponentMove["row"]][opponentMove["column"]] = opponent;
-						drawHexPiece(opponentMove["row"], opponentMove["column"], "red");
-
-						if (playerFlipCard.substr(0, 1) == "r") {
-							makeMove("r" + indexValues[opponentMove["row"]-1], opponent);
-							makeMove("b" + indexValues[opponentMove["column"]-1], opponent);
-						} else {
-							makeMove("b" + indexValues[opponentMove["column"]-1], opponent);
-							makeMove("r" + indexValues[opponentMove["row"]-1], opponent);
-						}
+						requestServerMove()
+						.then(
+							function(data) {
+								moveNumber = data["nextMoveNumber"];
+								playerFlipCard = data["playerFlipCard"];
+								playerPlayCard = data["playerPlayCard"];
+								opponentFlipCard = data["opponentFlipCard"];
+								opponentPlayCard = data["opponentPlayCard"];
+								loadGameBoard();
+							}
+						);
 
 						playerFlipCard = null;
 						playerPlayCard = null;
@@ -441,9 +452,6 @@
 						document.getElementById("opponentFlipCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentFlipCard.substr(0, 1))] + opponentFlipCard.substr(1) + ".png";
 						document.getElementById("opponentPlayCardImg").src = "<%= cardSet %>/" + opponentSuits["b,r".split(",").indexOf(opponentPlayCard.substr(0, 1))] + opponentPlayCard.substr(1) + ".png";
 
-						opponentMove = calculateComputerMove(opponent, gameBoard);
-						makeCellMove(opponentMove["row"], opponentMove["column"], opponent)
-;
 					} else {
 
 						alert("Both move to \"" + opponentFlipCard + "\", \"" + opponentPlayCard + ".\"  Opponent wins move.");
@@ -600,16 +608,39 @@
 			return false;
 		}
 
+		function requestServerMove() {
+			return getServerMoveStatus(moveNumber)
+			.then(
+				function(data) {
+					if (data["status"] == "READY") {
+						return getServerMove(moveNumber);
+					}
+				}
+			);
+		}
+
 		function sendPlayerMove() {
 			if (
 				playerFlipCard != null &&
 				playerPlayCard != null
 			) {
-				sendBoardMove(playerFlipCard, playerPlayCard);
+				sendBoardMove(playerFlipCard, playerPlayCard, moveNumber);
+				requestServerMove()
+				.then(
+					function(data) {
+						moveNumber = data["nextMoveNumber"];
+						playerFlipCard = data["playerFlipCard"];
+						playerPlayCard = data["playerPlayCard"];
+						opponentFlipCard = data["opponentFlipCard"];
+						opponentPlayCard = data["opponentPlayCard"];
+						showMoves();
+					}
+				);
 			}
 		}
 		
 		function drawHexPiece(row, column, color) {
+			drawHexCell(row, column, null);
 			drawSVGPiece(row, column, color);
 		}
 		
@@ -627,7 +658,7 @@
 			if (playerFlipCardIn) {
 				if ("br".indexOf(playerFlipCardIn.substr(0,1).toLowerCase()) == 1) {
 					playerMove["row"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
-				} else {
+				} else if ("br".indexOf(playerFlipCardIn.substr(0,1).toLowerCase()) == 0) {
 					playerMove["column"] = indexValues.indexOf(playerFlipCardIn.substr(1))+1;
 				}
 			}
@@ -635,7 +666,7 @@
 			if (playerPlayCardIn) {
 				if ("br".indexOf(playerPlayCardIn.substr(0,1).toLowerCase()) == 1) {
 					playerMove["row"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
-				} else {
+				} else if ("br".indexOf(playerPlayCardIn.substr(0,1).toLowerCase()) == 0) {
 					playerMove["column"] = indexValues.indexOf(playerPlayCardIn.substr(1))+1;
 				}
 			}
@@ -671,7 +702,6 @@
 					deleteLine = "r"+playerMove["row"];
 					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
 						if (gameBoard[playerMove["row"]][lineIndex] == null) {
-							drawHexCell(playerMove["row"], lineIndex, null);
 							drawHexPiece(playerMove["row"], lineIndex, "cyan");
 						}
 					}
@@ -679,7 +709,6 @@
 					deleteLine = "c"+playerMove["column"];
 					for (let lineIndex = 1; lineIndex <= indexValues.length; lineIndex++) {
 						if (gameBoard[lineIndex][playerMove["column"]] == null) {
-							drawHexCell(lineIndex, playerMove["column"], null);
 							drawHexPiece(lineIndex, playerMove["column"], "cyan");
 						}
 					}
@@ -702,7 +731,6 @@
 					}
 				}
 
-				drawHexCell(playerMove["row"], playerMove["column"], null);
 				drawHexPiece(playerMove["row"], playerMove["column"], "cyan");
 			}
 		}
@@ -804,7 +832,7 @@
 			.then(
 				function(data) {
 					gameBoard = data;
-					showMoves();
+					drawBoardPieces();
 				}
 			).catch(
 				function(err) {
@@ -813,9 +841,12 @@
 			);
 		}
 
-		function sendBoardMove(flipCardIn, playCardIn) {
+		function sendBoardMove(flipCardIn, playCardIn, moveNumberIn) {
+
+			console.log(moveNumberIn);
 
 			let boardMove = {
+				"moveNumber": moveNumberIn,
 				"flipCard": flipCardIn,
 				"playCard": playCardIn
 			};
@@ -823,13 +854,23 @@
 			getJSONResponse("putboardmove.jsp", "POST", boardMove)
 			.then(
 				function(data) {
-					loadGameBoard();
+					if (data["status"] == "READY") {
+						loadGameBoard();
+					}
 				}
 			).catch(
 				function(err) {
 					alert("Request encountered error: " + err);
 				}
 			);
+		}
+
+		function getServerMoveStatus(moveNumberIn) {
+			return getJSONResponse("getservermovestatus.jsp?moveNumber=" + moveNumberIn, "GET");
+		}
+
+		function getServerMove(moveNumberIn) {
+			return getJSONResponse("getservermove.jsp?moveNumber=" + moveNumberIn, "GET");
 		}
 	</script>
   </head>

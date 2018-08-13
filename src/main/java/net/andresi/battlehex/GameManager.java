@@ -1,37 +1,35 @@
 package battlehex;
 
 import com.google.appengine.api.users.User;
-import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.FullEntity;
+import com.google.cloud.datastore.IncompleteKey;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.PathElement;
 import com.google.cloud.datastore.Query;
 import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
 import com.google.cloud.datastore.StructuredQuery.OrderBy;
 import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.cloud.datastore.Transaction;
+import com.google.cloud.Timestamp;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 public class GameManager {
 
 	Key gameKey = null;
 
-	int player = 0;
-
 	List<String> indexValues = Arrays.asList("a", "2", "3", "4", "5", "6", "7", "8", "9", "10", "j", "q", "k");
 
 	public static final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
-	
-	public void setPlayer(int playerIn) {
-		player = playerIn;
-	}
-	
-	public int getPlayer() {
-		return player;
-	}
 
 	public Key getNewGame(User user, int playerIn, int boardRowsIn, int boardColumnsIn) {
 
@@ -40,29 +38,38 @@ public class GameManager {
 		String player2Nickname = "";
 		String player2ID = "";
 
-		KeyFactory keyFactory = datastore.newKeyFactory().setKind("Game");
-		Key key = keyFactory.newKey("gameKey");
+		Transaction transaction = datastore.newTransaction();
 
-		if (playerIn == BoardHelper.FIRST_PLAYER) {
+		if (playerIn == 1) {
 			player1Nickname = user.getNickname();
 			player1ID = user.getUserId();
-		} else if (playerIn == BoardHelper.SECOND_PLAYER) {
+		} else if (playerIn == 2) {
 			player2Nickname = user.getNickname();
 			player2ID = user.getUserId();
 		}
 
-		Entity game = Entity.newBuilder(key)
-			.set("player1Nickname", player1Nickname)
-			.set("player2Nickname", player2Nickname)
-			.set("player1ID", player1ID)
-			.set("player2ID", player2ID)
-			.set("boardRows", boardRowsIn)
-			.set("boardColumns", boardColumnsIn)
-			.set("lastModified", Timestamp.now())
-			.build()
-		;
-		game = datastore.put(game);
-		gameKey = game.getKey();
+		try {
+			KeyFactory keyFactory = datastore.newKeyFactory().setKind("Game");
+			IncompleteKey key = keyFactory.newKey();
+
+			FullEntity game = FullEntity.newBuilder(key)
+				.set("player1Nickname", player1Nickname)
+				.set("player2Nickname", player2Nickname)
+				.set("player1ID", player1ID)
+				.set("player2ID", player2ID)
+				.set("boardRows", boardRowsIn)
+				.set("boardColumns", boardColumnsIn)
+				.set("lastModified", Timestamp.now())
+				.build()
+			;
+			gameKey = transaction.add(game).getKey();
+			transaction.commit();
+
+		} finally {
+			if (transaction.isActive()) {
+				transaction.rollback();
+			}
+		}
 
 		return gameKey;
 	}
@@ -77,35 +84,49 @@ public class GameManager {
 
 	public Key joinExistingGame(String playerNickname, String playerID, String keyIn) {
 
-		Entity game = null;
 		Entity gameOut = null;
 
+		Transaction transaction = datastore.newTransaction();
 		gameKey = Key.fromUrlSafe(keyIn);
-		game = datastore.get(gameKey);
 
-		if (
-			game.getString("player1ID").equals("") &&
-			game.getString("player1Nickname").equals("")
-		) {
-			gameOut = Entity.newBuilder(game)
-				.set("player1Nickname", playerNickname)
-				.set("player1ID", playerID)
-				.set("lastModified", Timestamp.now())
-				.build()
-			;
-		} else if (
-			game.getString("player2ID").equals("") &&
-			game.getString("player2Nickname").equals("")
-		) {
-			gameOut = Entity.newBuilder(game)
-				.set("player2Nickname", playerNickname)
-				.set("player2ID", playerID)
-				.set("lastModified", Timestamp.now())
-				.build()
-			;
+		try {
+			Entity game = null;
+			game = transaction.get(gameKey);
+
+			if (
+				game.getString("player1ID").equals("") &&
+				game.getString("player1Nickname").equals("")
+			) {
+				gameOut = Entity.newBuilder(game)
+					.set("player1Nickname", playerNickname)
+					.set("player1ID", playerID)
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+			} else if (
+				game.getString("player2ID").equals("") &&
+				game.getString("player2Nickname").equals("")
+			) {
+				gameOut = Entity.newBuilder(game)
+					.set("player2Nickname", playerNickname)
+					.set("player2ID", playerID)
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+			}
+
+			if (gameOut != null) {
+				transaction.update(gameOut);
+				transaction.commit();
+				gameKey = gameOut.getKey();
+			}
+
+		} finally {
+			if (transaction.isActive()) {
+				transaction.rollback();
+			}
 		}
 
-		datastore.update(gameOut);
 		return gameKey;
 	}
 
@@ -138,9 +159,9 @@ public class GameManager {
 				) {
 					gameMovesOut[rowIndex][columnIndex] = 3;
 				} else if (rowIndex == 0 || rowIndex == gameMovesOut.length-1) {
-					gameMovesOut[rowIndex][columnIndex] = 1;
-				} else if (columnIndex == 0 || columnIndex == gameMovesOut[rowIndex].length-1) {
 					gameMovesOut[rowIndex][columnIndex] = 2;
+				} else if (columnIndex == 0 || columnIndex == gameMovesOut[rowIndex].length-1) {
+					gameMovesOut[rowIndex][columnIndex] = 1;
 				} else {
 					gameMovesOut[rowIndex][columnIndex] = 0;
 				}
@@ -157,32 +178,59 @@ public class GameManager {
 
 		while (gameMoves.hasNext()) {
 
-			String player1FlipCard, player1PlayCard, player2FlipCard, player2PlayCard;
+			String player1FlipCard = null;
+			String player1PlayCard = null;
+			String player2FlipCard = null;
+			String player2PlayCard = null;
+
 			int player1Coords[], player2Coords[];
 
 			gameMove = gameMoves.next();
 
-			player1FlipCard = gameMove.getString("player1FlipCard");
-			player1PlayCard = gameMove.getString("player1PlayCard");
-			player2FlipCard = gameMove.getString("player2FlipCard");
-			player2PlayCard = gameMove.getString("player2PlayCard");
+			try {
+				player1FlipCard = gameMove.getString("player1FlipCard");
+				player1PlayCard = gameMove.getString("player1PlayCard");
+				player2FlipCard = gameMove.getString("player2FlipCard");
+				player2PlayCard = gameMove.getString("player2PlayCard");
+			} catch (DatastoreException de) {
+			}
 
 			player1Coords = getMoveRowColumn(player1FlipCard, player1PlayCard);
 			player2Coords = getMoveRowColumn(player2FlipCard, player2PlayCard);
 
 			if (
-				(player1Coords[0] == player2Coords[0]) &&
-				(player1Coords[1] == player2Coords[1])
+				!(player1FlipCard == null) &&
+				!(player1PlayCard == null) &&
+				!(player2FlipCard == null) &&
+				!(player2PlayCard == null)
 			) {
-				if (player1FlipCard.equals(player2FlipCard)) {
-					gameMovesOut[player1Coords[0]][player1Coords[1]] = 1;
+
+				if (
+					(player1Coords[0] == player2Coords[0]) &&
+					(player1Coords[1] == player2Coords[1]) &&
+					(player1Coords[0] != 0) &&
+					(player1Coords[1] != 0)
+				) {
+					if (player1FlipCard.equals(player2FlipCard)) {
+						gameMovesOut[player1Coords[0]][player1Coords[1]] = 1;
+					} else {
+						gameMovesOut[player2Coords[0]][player2Coords[1]] = 2;
+					}
 				} else {
-					gameMovesOut[player2Coords[0]][player2Coords[1]] = 2;
-				}
-			} else {
-				gameMovesOut[player1Coords[0]][player1Coords[1]] = 1;
-				gameMovesOut[player2Coords[0]][player2Coords[1]] = 2;
-			}	
+					if (
+						(player1Coords[0] != 0) &&
+						(player1Coords[1] != 0)
+					) {
+						gameMovesOut[player1Coords[0]][player1Coords[1]] = 1;
+					}
+					if (
+						(player2Coords[0] != 0) &&
+						(player2Coords[1] != 0)
+					) {
+						gameMovesOut[player2Coords[0]][player2Coords[1]] = 2;
+					}
+				}	
+			}
 		}
 
 		return gameMovesOut;
@@ -233,38 +281,299 @@ public class GameManager {
 		return playerMove;
 	}
 
+	public HashMap<String, String> getRandomCardsFromCoords(int rowIn, int columnIn) {
+
+		Random rand = new Random();
+		int flipIndex = rand.nextInt(2);
+
+		HashMap<String, String> moveOut = new HashMap<String, String>();
+
+		String cards[] = {
+			"r" + indexValues.get(rowIn-1),
+			"b" + indexValues.get(columnIn-1)
+		};
+
+		moveOut.put("flipCard", cards[flipIndex]);
+		moveOut.put("playCard", cards[((flipIndex + 1) % 2)]);
+
+		return moveOut;	
+	}
+
+	public void putComputerMove(String flipCardIn, String playCardIn) {
+		putGameMove("(Computer)", "", flipCardIn, playCardIn);
+	}
+
 	public void putGameMove(User user, String flipCardIn, String playCardIn) {
 		putGameMove(user.getNickname(), user.getUserId(), flipCardIn, playCardIn);
 	}
 
 	public void putGameMove(String userNickname, String userID, String flipCardIn, String playCardIn) {
 
+		Key gameMoveKey = null;
+		String player = "player" + Integer.toString(getPlayer(userNickname, userID));
+
+		Transaction transaction = datastore.newTransaction();
+
+		Query<Entity> query = Query.newEntityQueryBuilder()
+    			.setKind("GameMove")
+    			.setFilter(PropertyFilter.hasAncestor(gameKey))
+			.setOrderBy(OrderBy.desc("moveNumber"))
+			.setLimit(1)
+    			.build()
+		;
+
+		try {
+			Entity gameMove = null;
+
+			QueryResults<Entity> gameMoves = null;
+
+			String flipCard = "";
+			String playCard = "";
+
+			gameMoves = transaction.run(query);
+			while (gameMoves.hasNext()) {
+				gameMove = gameMoves.next();
+			}
+
+			try {
+				flipCard = gameMove.getString(player + "FlipCard");
+				playCard = gameMove.getString(player + "PlayCard");
+			} catch (DatastoreException de) {
+			}
+
+			if (
+				flipCard.equals("") &&
+				playCard.equals("")
+			) {
+				gameMove = Entity.newBuilder(gameMove)
+					.set(player + "FlipCard", flipCardIn)
+					.set(player + "PlayCard", playCardIn)
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+
+				System.out.println(
+					"gameMove.getString(moveNumber): " + Long.toString(gameMove.getLong("moveNumber")) + "; " +
+					player + "FlipCard = " + flipCardIn + "; " +
+					player + "PlayCard = " + playCardIn + ";"
+				);
+
+				transaction.update(gameMove);
+				transaction.commit();
+			}
+
+			gameMoveKey = gameMove.getKey();
+
+		} finally {
+			if (transaction.isActive()) {
+				transaction.rollback();
+			}
+		}
+	}
+
+	public int createGameMove(int moveNumber) {
+
+		FullEntity gameMove = null;
+		Transaction transaction = datastore.newTransaction();
+
+		Query<Entity> query = Query.newEntityQueryBuilder()
+    			.setKind("GameMove")
+    			.setFilter(PropertyFilter.hasAncestor(gameKey))
+			.setOrderBy(OrderBy.desc("moveNumber"))
+			.setLimit(1)
+    			.build()
+		;
+
+		try {
+			String player1FlipCard = null;
+			String player1PlayCard = null;
+			String player2FlipCard = null;
+			String player2PlayCard = null;
+
+			KeyFactory keyFactory = datastore.newKeyFactory()
+				.addAncestor(PathElement.of("Game", gameKey.getId()))
+				.setKind("GameMove")
+			;
+			IncompleteKey key = keyFactory.newKey();
+
+			QueryResults<Entity> gameMoves = transaction.run(query);
+			if (gameMoves.hasNext()) {
+				gameMove = gameMoves.next();
+			}
+
+			try {
+				player1FlipCard = gameMove.getString("player1FlipCard");
+				player1PlayCard = gameMove.getString("player1PlayCard");
+				player2FlipCard = gameMove.getString("player2FlipCard");
+				player2PlayCard = gameMove.getString("player2PlayCard");
+			} catch (DatastoreException de) {
+			} catch (NullPointerException npe) {
+			}
+
+			if (gameMove == null) {
+				gameMove = FullEntity.newBuilder(key)
+					.set("moveNumber", moveNumber)
+					.set("lastModified", Timestamp.now())
+					.build()
+				;
+				gameMove = transaction.add(gameMove);
+				transaction.commit();
+			} else if (
+				player1FlipCard != null &&
+				player1PlayCard != null &&
+				player2FlipCard != null &&
+				player2PlayCard != null
+			) {
+				moveNumber = (int)gameMove.getLong("moveNumber") + 1;
+
+				if (
+					player1FlipCard.equals(player2FlipCard) &&
+					player1PlayCard.equals(player2PlayCard)
+				) {
+					gameMove = FullEntity.newBuilder(key)
+						.set("moveNumber", moveNumber)
+						.set("player1FlipCard", "(null)")
+						.set("player1PlayCard", "(null)")
+						.set("lastModified", Timestamp.now())
+						.build()
+					;
+				} else if (
+					player1FlipCard.equals(player2PlayCard) &&
+					player1PlayCard.equals(player2FlipCard)
+				) {
+					gameMove = FullEntity.newBuilder(key)
+						.set("moveNumber", moveNumber)
+						.set("player2FlipCard", "(null)")
+						.set("player2PlayCard", "(null)")
+						.set("lastModified", Timestamp.now())
+						.build()
+					;
+				} else {
+					gameMove = FullEntity.newBuilder(key)
+						.set("moveNumber", moveNumber)
+						.set("lastModified", Timestamp.now())
+						.build()
+					;
+				}
+
+				gameMove = transaction.add(gameMove);
+				transaction.commit();
+			}
+
+		} finally {
+			if (transaction.isActive()) {
+				transaction.rollback();
+			}
+		}
+	
+		return (int)gameMove.getLong("moveNumber");
+	}
+
+	public String[] getOpponentMove(User user, int moveNumberIn) {
+		return getOpponentMove(user.getNickname(), user.getUserId(), moveNumberIn);
+	}
+
+	public String[] getOpponentMove(String userNickname, String userID, int moveNumberIn) {
+		String player = "player" + Integer.toString(getOpponent(userNickname, userID));
+		return getPlayerMove(player, moveNumberIn);
+	}
+
+	public String[] getPlayerMove(User user, int moveNumberIn) {
+		return getPlayerMove(user.getNickname(), user.getUserId(), moveNumberIn);
+	}
+
+	public String[] getPlayerMove(String userNickname, String userID, int moveNumberIn) {
+		String player = "player" + Integer.toString(getPlayer(userNickname, userID));
+		return getPlayerMove(player, moveNumberIn);
+	}
+
+	public String[] getPlayerMove(String playerIn, int moveNumberIn) {
+
+		QueryResults<Entity> gameMoves = null;
+
 		Entity game = null;
 		Entity gameMove = null;
-		String player = "";
+		String opponent = null;
+		String gameMoveOut[] = {"", ""};
 
-		KeyFactory keyFactory = datastore.newKeyFactory().setKind("GameMove");
-		Key key = keyFactory.newKey("gameMoveKey");
+		Query<Entity> query = Query.newEntityQueryBuilder()
+    			.setKind("GameMove")
+			.setFilter(
+				CompositeFilter.and(
+					PropertyFilter.hasAncestor(gameKey),
+					PropertyFilter.eq("moveNumber", moveNumberIn)
+				)
+			).setLimit(1)
+    			.build()
+		;
 
-		game = datastore.get(gameKey);
+		gameMoves = datastore.run(query);
+		while (gameMoves.hasNext()) {
+			gameMove = gameMoves.next();
+		}
+
+		try {
+			gameMoveOut[0] = gameMove.getString(playerIn + "FlipCard");
+			gameMoveOut[1] = gameMove.getString(playerIn + "PlayCard");
+		} catch (DatastoreException de) {
+		}
+
+		return gameMoveOut;
+	}
+
+	public int getPlayerMoveStatus(User user, int moveNumberIn) {
+		String[] gameMoveOut = getPlayerMove(user, moveNumberIn);
+		if (
+			!gameMoveOut[0].equals("") &&
+			!gameMoveOut[1].equals("")
+		) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	public int getOpponentMoveStatus(User user, int moveNumberIn) {
+		String[] gameMoveOut = getOpponentMove(user, moveNumberIn);
+		if (
+			!gameMoveOut[0].equals("") &&
+			!gameMoveOut[1].equals("")
+		) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	public int getPlayer(User user) {
+		return getPlayer(user.getNickname(), user.getUserId());
+	}
+
+	public int getPlayer(String userNickname, String userID) {
+
+		Entity game = datastore.get(gameKey);
+		int player = 0;
+
 		if (
 			userNickname.equals(game.getString("player1Nickname")) &&
 			userID.equals(game.getString("player1ID"))
 		) {
-			player = "player1";
+			player = 1;
 		} else if (
 			userNickname.equals(game.getString("player2Nickname")) &&
 			userID.equals(game.getString("player2ID"))
 		) {
-			player = "player2";
+			player = 2;
 		}
-		
-		gameMove = Entity.newBuilder(key)
-			.set(player + "FlipCard", flipCardIn)
-			.set(player + "PlayCard", playCardIn)
-			.set("lastModified", Timestamp.now())
-			.build()
-		;
-		datastore.put(gameMove);
+
+		return player;
+	}
+
+	public int getOpponent(User user) {
+		return getOpponent(user.getNickname(), user.getUserId());
+	}
+
+	public int getOpponent(String userNickname, String userID) {
+		return (getPlayer(userNickname, userID) % 2) + 1;
 	}
 }

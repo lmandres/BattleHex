@@ -1,4 +1,4 @@
-<%@ page language="java" contentType="application/json; charset=ISO-8859-1" pageEncoding="ISO-8859-1" %>
+<%@ page language="java" contentType="application/json; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ page import="battlehex.BoardHelper" %>
 <%@ page import="battlehex.GameManager" %>
 <%@ page import="com.google.appengine.api.users.User" %>
