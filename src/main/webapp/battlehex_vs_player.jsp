@@ -362,12 +362,6 @@
 					);
 				}
 			}
-
-			if (evaluateWin(player, gameBoard)) {
-				alert("Player wins!");
-			} else if (evaluateWin(opponent, gameBoard)) {
-				alert("Opponent wins!");
-			}
 		}
 
 		function tieBreaker() {
@@ -468,151 +462,21 @@
 			}
 		}
 
-		function evaluateWin(playerIn, gameBoardIn) {
-
-			let evalArray = [3, playerIn];
-			let traverseFunctions = [
-				function() {
-					if ((currentColumn < indexValues.length+1)) {
-						if (evalArray.indexOf(gameBoardIn[currentRow][currentColumn+1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentRow < indexValues.length+1) { 
-						if (evalArray.indexOf(gameBoardIn[currentRow+1][currentColumn]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if ((currentRow < indexValues.length+1) && (currentColumn > 0)) {
-						if (evalArray.indexOf(gameBoardIn[currentRow+1][currentColumn-1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentColumn > 0) {
-						if (evalArray.indexOf(gameBoardIn[currentRow][currentColumn-1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if (currentRow > 0) {
-						if (evalArray.indexOf(gameBoardIn[currentRow-1][currentColumn]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				},
-				function() {
-					if ((currentRow > 0) && (currentColumn < indexValues.length+1)) {
-	 					if (evalArray.indexOf(gameBoardIn[currentRow-1][currentColumn+1]) >= 0) {
-							return true;
-						}
-					}
-					return false;
-				}
-			];
-
-			let incrementFunctions = [
-				function() {
-					currentColumn++;
-				},
-				function() {
-					currentRow++;
-				},
-				function() {
-					currentRow++;
-					currentColumn--;
-				},
-				function() {
-					currentColumn--;
-				},
-				function() {
-					currentRow--;
-				},
-				function() {
-	 				currentRow--;
-					currentColumn++;
-				}
-			];
-
-			let lastIndex = null;
-			let startIndex = null;
-
-			let currentRow = null;
-			let currentColumn = null;
-
-			if (playerIn == 1) {
-				startIndex = 0;
-				currentRow = 0;
-				currentColumn = 0;
-			} else if (playerIn == 2) {
-				startIndex = 0;
-				currentRow = 0;
-				currentColumn = 0;
-			}
-
-			if (playerIn == 1) {
-				while (true) {
-					if (!traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-						incrementFunctions[startIndex]();
-						startIndex = ((startIndex+4) % 6);
-					} else if (traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else if (traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else if (!traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else {
-						startIndex = ((startIndex+1) % 6);
-					}
-					if (gameBoardIn[currentRow][currentColumn] == 3) {
-						break;
-					}
-				}
-			} else if (playerIn == 2) {
-				while (true) {
-					if (traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						incrementFunctions[startIndex]();
-					} else if (!traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else if (traverseFunctions[startIndex]() && traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+1) % 6);
-					} else if (!traverseFunctions[startIndex]() && !traverseFunctions[((startIndex+1) % 6)]()) {
-						startIndex = ((startIndex+5) % 6);
-					} else {
-						startIndex = ((startIndex+5) % 6);
-					}
-					if (gameBoardIn[currentRow][currentColumn] == 3) {
-						break;
-					}
-				}
-			}
-
-			if ((playerIn == 1) && (currentColumn >= indexValues.length+1)) {
-				return true;
-			} else if ((playerIn == 2) && (currentRow >= indexValues.length+1)) {
-				return true;
-			}
-
-			return false;
-		}
-
 		function requestServerMove() {
 			return getServerMoveStatus(moveNumber)
 			.then(
 				function(data) {
+					document.getElementById("sendMove").disabled = true;
 					if (data["status"] == "READY") {
+						return getServerMove(moveNumber);
+					} else if (data["status"] == "WON") {
+
+						if (data["player"] == player) {
+							alert("Player wins!");
+						} else if (data["player"] == opponent) {
+							alert("Opponent wins!");
+						}
+
 						return getServerMove(moveNumber);
 					}
 				}
@@ -842,8 +706,6 @@
 		}
 
 		function sendBoardMove(flipCardIn, playCardIn, moveNumberIn) {
-
-			console.log(moveNumberIn);
 
 			let boardMove = {
 				"moveNumber": moveNumberIn,

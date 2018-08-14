@@ -32,26 +32,30 @@
 		gameKey = Key.fromUrlSafe(pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE).toString());
 
 		gameManager.setGameKey(gameKey);
-		gameAI.setMonteCarloIterations(100);
+		gameAI.setMonteCarloIterations(1000);
 
-		System.out.println(
-			"moveNumber: " + Integer.toString(moveNumber) + "; " +
-			Integer.toString(gameManager.getOpponentMoveStatus(user, moveNumber)));
-
-		if (gameManager.getOpponentMoveStatus(user, moveNumber) == 0) {
-			aiCoords = gameAI.calculateComputerMove(gameManager.getPlayer(user), gameAI.convertBoardArraysToLists(gameManager.getGameMoves()));
+		if (
+			!(
+				BoardHelper.evaluateWin(1, gameManager.getGameMoves()) ||
+				BoardHelper.evaluateWin(2, gameManager.getGameMoves())
+			) && gameManager.getOpponentMoveStatus(user, moveNumber) == 0
+		) {
+			aiCoords = gameAI.calculateComputerMove(gameManager.getPlayer(user), BoardHelper.convertBoardArraysToLists(gameManager.getGameMoves()));
 			aiMove = gameManager.getRandomCardsFromCoords(aiCoords.get("row"), aiCoords.get("column"));
 			gameManager.putComputerMove(aiMove.get("flipCard"), aiMove.get("playCard"));
-		} else if (gameManager.getOpponentMoveStatus(user, moveNumber) == 1) {
-			String[] cards = gameManager.getOpponentMove(user, moveNumber);
-			System.out.println(
-				"cards[0]: " + cards[0] + "; " +
-				"cards[1]: " + cards[1] + ";"
-			);
 		}
 
-		if (gameManager.getOpponentMoveStatus(user, moveNumber) == 0) {
+		if (
+			!(
+				BoardHelper.evaluateWin(1, gameManager.getGameMoves()) ||
+				BoardHelper.evaluateWin(2, gameManager.getGameMoves())
+			) && gameManager.getOpponentMoveStatus(user, moveNumber) == 0
+		) {
 			%>{"status": "WAITING"}<%
+		} else if (BoardHelper.evaluateWin(1, gameManager.getGameMoves())) {
+			%>{"status": "WON", "player": 1}<%
+		} else if (BoardHelper.evaluateWin(2, gameManager.getGameMoves())) {
+			%>{"status": "WON", "player": 2}<%
 		} else if (gameManager.getOpponentMoveStatus(user, moveNumber) == 1) {
 			%>{"status": "READY"}<%
 		} else {

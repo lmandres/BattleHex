@@ -1,6 +1,9 @@
 package battlehex;
 
 import java.lang.Math;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 
 public class BoardHelper {
 	
@@ -28,6 +31,257 @@ public class BoardHelper {
 		startYCoord = 0;
 		
 		setBoardShape(VERTICAL_BOARD+FIRST_PLAYER);
+	}
+	
+	interface BoardTraverse {
+        	public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player);
+		public HashMap<String, Integer> increment(int currentRow, int currentColumn);
+    	}
+
+    	private static BoardTraverse[] boardTraversions = new BoardTraverse[] {
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentColumn < gameBoardIn.get(currentRow).size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn+1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow);
+				incrementOut.put("column", currentColumn+1);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow < gameBoardIn.size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow+1);
+				incrementOut.put("column", currentColumn);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow < gameBoardIn.size()-1) && (currentColumn > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn-1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow+1);
+				incrementOut.put("column", currentColumn-1);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentColumn > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn-1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow);
+				incrementOut.put("column", currentColumn-1);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow > 0)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow-1);
+				incrementOut.put("column", currentColumn);
+
+				return incrementOut;
+			}
+		},
+		new BoardTraverse() {
+			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
+				if ((currentRow > 0) && (currentColumn < gameBoardIn.get(currentRow).size()-1)) {
+					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn+1)) >= 0) {
+						return true;
+					}
+				}
+				return false;
+			}
+			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
+
+				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
+
+				incrementOut.put("row", currentRow-1);
+				incrementOut.put("column", currentColumn+1);
+
+				return incrementOut;
+			}
+		}
+	};
+
+    	public static boolean evaluateWin(int playerIn, int[][] gameBoardIn) {
+		return evaluateWin(playerIn, convertBoardArraysToObjLists(gameBoardIn));
+	}
+
+    	public static boolean evaluateWin(int playerIn, ArrayList<ArrayList<Object>> gameBoardIn) {
+
+		int startIndex = 0;
+		int currentRow = 0;
+		int currentColumn = 0;
+
+		if (playerIn == 1) {
+			while (true) {
+				if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
+					currentRow = (Integer)coordMap.get("row");
+					currentColumn = (Integer)coordMap.get("column");
+					startIndex = ((startIndex+4) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+				} else {
+					startIndex = ((startIndex+1) % 6);
+				}
+				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
+					break;
+				}
+			}
+		} else if (playerIn == 2) {
+			while (true) {
+				if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
+					currentRow = (Integer)coordMap.get("row");
+					currentColumn = (Integer)coordMap.get("column");
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+				} else if (
+					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+1) % 6);
+				} else if (
+					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
+					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
+				) {
+					startIndex = ((startIndex+5) % 6);
+				} else {
+					startIndex = ((startIndex+5) % 6);
+				}
+				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
+					break;
+				}
+			}
+		}
+
+		if ((playerIn == 1) && (currentColumn >= gameBoardIn.get(currentRow).size()-1)) {
+			return true;
+		} else if ((playerIn == 2) && (currentRow >= gameBoardIn.size()-1)) {
+			return true;
+		}
+
+		return false;
+	}
+
+	private static ArrayList<ArrayList<Object>> convertBoardArraysToObjLists(int[][] gameBoardIn) {
+
+		ArrayList<ArrayList<Object>> gameBoardOut = new ArrayList<ArrayList<Object>>();
+
+		for (int rowIndex = 0; rowIndex < gameBoardIn.length; rowIndex++) {
+			ArrayList<Object> intObjList = new ArrayList<Object>();
+			for (int columnIndex = 0; columnIndex < gameBoardIn[rowIndex].length; columnIndex++) {
+				intObjList.add(gameBoardIn[rowIndex][columnIndex]);
+			}
+			gameBoardOut.add(intObjList);
+		}
+
+		return gameBoardOut;
+	}
+
+	public static ArrayList<ArrayList<Integer>> convertBoardArraysToLists(int[][] gameBoardIn) {
+
+		ArrayList<ArrayList<Integer>> gameBoardOut = new ArrayList<ArrayList<Integer>>();
+
+		for (int rowIndex = 0; rowIndex < gameBoardIn.length; rowIndex++) {
+			ArrayList<Integer> intObjList = new ArrayList<Integer>();
+			for (int columnIndex = 0; columnIndex < gameBoardIn[rowIndex].length; columnIndex++) {
+				intObjList.add(gameBoardIn[rowIndex][columnIndex]);
+			}
+			gameBoardOut.add(intObjList);
+		}
+
+		return gameBoardOut;
+	}
+
+	public static int[][] convertBoardListsToArrays(ArrayList<ArrayList<Integer>> gameBoardIn) {
+
+		int[][] gameBoardOut = new int[gameBoardIn.size()][];
+
+		for (int rowIndex = 0; rowIndex < gameBoardIn.size(); rowIndex++) {
+			gameBoardOut[rowIndex] = new int[gameBoardIn.get(rowIndex).size()];
+			for (int columnIndex = 0; columnIndex < gameBoardIn.get(rowIndex).size(); columnIndex++) {
+				gameBoardOut[rowIndex][columnIndex] = gameBoardIn.get(rowIndex).get(columnIndex);
+			}
+		}
+
+		return gameBoardOut;
 	}
 	
 	public void setPlayer(int playerIn) {

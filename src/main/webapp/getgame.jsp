@@ -14,7 +14,7 @@
 	Key gameKey = null;
 
 	if (user == null) {
-		response.sendRedirect("http://battle-hex.appspot.com/index.jsp");
+		response.sendRedirect("index.jsp");
 	} else {
 
 		pageContext.setAttribute("user", user, PageContext.SESSION_SCOPE);
@@ -35,6 +35,7 @@
 				gameKey = gameManager.getNewGame(user, player, 13, 13);
 				pageContext.setAttribute("player", player, PageContext.SESSION_SCOPE);
 				pageContext.setAttribute("gameKey", gameKey.toUrlSafe(), PageContext.SESSION_SCOPE);
+				pageContext.setAttribute("moveNumber", gameManager.createGameMove(1), PageContext.SESSION_SCOPE);
 
 			} else if (request.getParameter("action").equals("2")) {
 				// Join Game
@@ -42,6 +43,7 @@
 					gameKey = gameManager.joinExistingGame(user, request.getParameter("gameKey").toString());
 					if (gameKey != null) {
 						pageContext.setAttribute("gameKey", gameKey.toUrlSafe(), PageContext.SESSION_SCOPE);
+						pageContext.setAttribute("moveNumber", gameManager.createGameMove(1), PageContext.SESSION_SCOPE);
 					}
 				}
 			} else if (request.getParameter("action").equals("3")) {

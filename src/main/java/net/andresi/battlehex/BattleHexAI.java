@@ -1,5 +1,7 @@
 package battlehex;
 
+import battlehex.BoardHelper;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -12,128 +14,6 @@ import org.apache.commons.math3.stat.StatUtils;
 public class BattleHexAI {
 
 	int monteCarloIterations = 0;
-	
-	interface BoardTraverse {
-        	public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player);
-		public HashMap<String, Integer> increment(int currentRow, int currentColumn);
-    	}
-
-    	private BoardTraverse[] boardTraversions = new BoardTraverse[] {
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentColumn < gameBoardIn.get(currentRow).size()-1)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn+1)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow);
-				incrementOut.put("column", currentColumn+1);
-
-				return incrementOut;
-			}
-		},
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentRow < gameBoardIn.size()-1)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow+1);
-				incrementOut.put("column", currentColumn);
-
-				return incrementOut;
-			}
-		},
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentRow < gameBoardIn.size()-1) && (currentColumn > 0)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow+1).get(currentColumn-1)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow+1);
-				incrementOut.put("column", currentColumn-1);
-
-				return incrementOut;
-			}
-		},
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentColumn > 0)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow).get(currentColumn-1)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow);
-				incrementOut.put("column", currentColumn-1);
-
-				return incrementOut;
-			}
-		},
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentRow > 0)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow-1);
-				incrementOut.put("column", currentColumn);
-
-				return incrementOut;
-			}
-		},
-		new BoardTraverse() {
-			public boolean move(ArrayList<ArrayList<Object>> gameBoardIn, int currentRow, int currentColumn, int player) {
-				if ((currentRow > 0) && (currentColumn < gameBoardIn.get(currentRow).size()-1)) {
-					if (Arrays.asList(3, player).indexOf(gameBoardIn.get(currentRow-1).get(currentColumn+1)) >= 0) {
-						return true;
-					}
-				}
-				return false;
-			}
-			public HashMap<String, Integer> increment(int currentRow, int currentColumn) {
-
-				HashMap<String, Integer> incrementOut = new HashMap<String, Integer>();
-
-				incrementOut.put("row", currentRow-1);
-				incrementOut.put("column", currentColumn+1);
-
-				return incrementOut;
-			}
-		}
-	};
 
 	public void setMonteCarloIterations(int iterationsIn) {
 		monteCarloIterations = iterationsIn;
@@ -157,7 +37,7 @@ public class BattleHexAI {
 			int currentColumn = (Integer)moveLists.get(index).get(0).get("column");
 			double currentWeight = testMoveUsingMonteCarlo(playerIn, gameBoardIn, currentRow, currentColumn);
 
-			if (currentWeight > maxWeight) {
+			if (currentWeight >= maxWeight) {
 				moveOut.put("row", currentRow);
 				moveOut.put("column", currentColumn);
 			}
@@ -183,18 +63,18 @@ public class BattleHexAI {
 
 			int playerMove = (Integer)randomBoard.get(rowIn).get(columnIn);
 
-			if (evaluateWin(playerIn, randomBoard)) {
+			if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 				test1 = playerIn;
-			} else if (evaluateWin(opponent, randomBoard)) {
+			} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 				test1 = opponent;
 			}
 
 			playerMove = (playerMove % 2) + 1;
 			randomBoard.get(rowIn).set(columnIn, playerMove);
 
-			if (evaluateWin(playerIn, randomBoard)) {
+			if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 				test2 = playerIn;
-			} else if (evaluateWin(opponent, randomBoard)) {
+			} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 				test2 = opponent;
 			}
 
@@ -231,9 +111,9 @@ public class BattleHexAI {
 					(Integer)emptyCoords.get(coordIndex).get("column")
 				);
 
-				if (evaluateWin(playerIn, randomBoard)) {
+				if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 					test1 = playerIn;
-				} else if (evaluateWin(opponent, randomBoard)) {
+				} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 					test1 = opponent;
 				}
 
@@ -245,9 +125,9 @@ public class BattleHexAI {
 					playerMove
 				);
 
-				if (evaluateWin(playerIn, randomBoard)) {
+				if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 					test2 = playerIn;
-				} else if (evaluateWin(opponent, randomBoard)) {
+				} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 					test2 = opponent;
 				}
 
@@ -355,117 +235,6 @@ public class BattleHexAI {
 		return randomBoard;
 	}
 
-	public ArrayList<ArrayList<Integer>> convertBoardArraysToLists(int[][] gameBoardIn) {
-
-		ArrayList<ArrayList<Integer>> gameBoardOut = new ArrayList<ArrayList<Integer>>();
-
-		for (int rowIndex = 0; rowIndex < gameBoardIn.length; rowIndex++) {
-			ArrayList<Integer> intObjList = new ArrayList<Integer>();
-			for (int columnIndex = 0; columnIndex < gameBoardIn[rowIndex].length; columnIndex++) {
-				intObjList.add(gameBoardIn[rowIndex][columnIndex]);
-			}
-			gameBoardOut.add(intObjList);
-		}
-
-		return gameBoardOut;
-	}
-
-	public int[][] convertBoardListsToArrays(ArrayList<ArrayList<Integer>> gameBoardIn) {
-
-		int[][] gameBoardOut = new int[gameBoardIn.size()][];
-
-		for (int rowIndex = 0; rowIndex < gameBoardIn.size(); rowIndex++) {
-			gameBoardOut[rowIndex] = new int[gameBoardIn.get(rowIndex).size()];
-			for (int columnIndex = 0; columnIndex < gameBoardIn.get(rowIndex).size(); columnIndex++) {
-				gameBoardOut[rowIndex][columnIndex] = gameBoardIn.get(rowIndex).get(columnIndex);
-			}
-		}
-
-		return gameBoardOut;
-	}
-
-    	public boolean evaluateWin(int playerIn, ArrayList<ArrayList<Object>> gameBoardIn) {
-
-		int startIndex = 0;
-		int currentRow = 0;
-		int currentColumn = 0;
-
-		if (playerIn == 1) {
-			while (true) {
-				if (
-					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+1) % 6);
-					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
-					currentRow = (Integer)coordMap.get("row");
-					currentColumn = (Integer)coordMap.get("column");
-					startIndex = ((startIndex+4) % 6);
-				} else if (
-					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+5) % 6);
-				} else if (
-					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+5) % 6);
-				} else if (
-					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+1) % 6);
-				} else {
-					startIndex = ((startIndex+1) % 6);
-				}
-				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
-					break;
-				}
-			}
-		} else if (playerIn == 2) {
-			while (true) {
-				if (
-					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					HashMap<String, Integer> coordMap = boardTraversions[startIndex].increment(currentRow, currentColumn);
-					currentRow = (Integer)coordMap.get("row");
-					currentColumn = (Integer)coordMap.get("column");
-				} else if (
-					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+1) % 6);
-				} else if (
-					boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+1) % 6);
-				} else if (
-					!boardTraversions[startIndex].move(gameBoardIn, currentRow, currentColumn, playerIn) &&
-					!boardTraversions[((startIndex+1) % 6)].move(gameBoardIn, currentRow, currentColumn, playerIn)
-				) {
-					startIndex = ((startIndex+5) % 6);
-				} else {
-					startIndex = ((startIndex+5) % 6);
-				}
-				if ((Integer)gameBoardIn.get(currentRow).get(currentColumn) == 3) {
-					break;
-				}
-			}
-		}
-
-		if ((playerIn == 1) && (currentColumn >= gameBoardIn.get(currentRow).size()-1)) {
-			return true;
-		} else if ((playerIn == 2) && (currentRow >= gameBoardIn.size()-1)) {
-			return true;
-		}
-
-		return false;
-	}
-
-
 /*
 		function calculateComputerMove(playerIn, gameBoardIn) {
 
@@ -562,17 +331,17 @@ public class BattleHexAI {
 				let test1 = null;
 				let test2 = null;
 
-				if (evaluateWin(playerIn, randomBoard)) {
+				if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 					test1 = playerIn;
-				} else if (evaluateWin(opponent, randomBoard)) {
+				} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 					test1 = opponent;
 				}
 
 				randomBoard[rowIn][columnIn] = opponent;
 
-				if (evaluateWin(playerIn, randomBoard)) {
+				if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 					test2 = playerIn;
-				} else if (evaluateWin(opponent, randomBoard)) {
+				} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 					test2 = opponent;
 				}
 
@@ -610,17 +379,17 @@ public class BattleHexAI {
 					let test1 = null;
 					let test2 = null;
 
-					if (evaluateWin(playerIn, randomBoard)) {
+					if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 						test1 = playerIn;
-					} else if (evaluateWin(opponent, randomBoard)) {
+					} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 						test1 = opponent;
 					}
 
 					randomBoard[emptyCoords[calcIndex2][0]][emptyCoords[calcIndex2][1]] = (randomBoard[emptyCoords[calcIndex2][0]][emptyCoords[calcIndex2][1]] % 2) + 1;
 
-					if (evaluateWin(playerIn, randomBoard)) {
+					if (BoardHelper.evaluateWin(playerIn, randomBoard)) {
 						test2 = playerIn;
-					} else if (evaluateWin(opponent, randomBoard)) {
+					} else if (BoardHelper.evaluateWin(opponent, randomBoard)) {
 						test2 = opponent;
 					}
 

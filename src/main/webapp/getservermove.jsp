@@ -27,7 +27,7 @@
 		gameManager.setGameKey(gameKey);
 
 		if (gameManager.getOpponentMoveStatus(user, moveNumber) == 0) {
-			%>{"status": "WAITING"}<%
+			%>{"status": "WAITING", "nextMoveNumber": <%= moveNumber %>}<%
 		} else if (
 			gameManager.getPlayerMoveStatus(user, moveNumber) == 1 &&
 			gameManager.getOpponentMoveStatus(user, moveNumber) == 1
@@ -44,7 +44,7 @@
 			}
 <%
 		} else {
-			%>{"status": "ERROR"}<%
+			%>{"status": "ERROR", "nextMoveNumber": <%= moveNumber %>}<%
 		}
 	}
 %>

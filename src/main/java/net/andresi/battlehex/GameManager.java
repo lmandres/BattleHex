@@ -1,5 +1,7 @@
 package battlehex;
 
+import battlehex.BoardHelper;
+
 import com.google.appengine.api.users.User;
 import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreException;
@@ -18,6 +20,7 @@ import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
 import com.google.cloud.datastore.Transaction;
 import com.google.cloud.Timestamp;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -351,12 +354,6 @@ public class GameManager {
 					.set("lastModified", Timestamp.now())
 					.build()
 				;
-
-				System.out.println(
-					"gameMove.getString(moveNumber): " + Long.toString(gameMove.getLong("moveNumber")) + "; " +
-					player + "FlipCard = " + flipCardIn + "; " +
-					player + "PlayCard = " + playCardIn + ";"
-				);
 
 				transaction.update(gameMove);
 				transaction.commit();
