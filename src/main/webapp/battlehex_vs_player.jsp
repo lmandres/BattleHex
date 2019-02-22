@@ -488,6 +488,7 @@
 				playerFlipCard != null &&
 				playerPlayCard != null
 			) {
+				document.getElementById("sendMove").disabled = true;
 				sendBoardMove(playerFlipCard, playerPlayCard, moveNumber);
 				requestServerMove()
 				.then(

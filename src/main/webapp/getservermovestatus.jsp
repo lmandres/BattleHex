@@ -32,7 +32,7 @@
 		gameKey = Key.fromUrlSafe(pageContext.getAttribute("gameKey", PageContext.SESSION_SCOPE).toString());
 
 		gameManager.setGameKey(gameKey);
-		gameAI.setMonteCarloIterations(1000);
+		gameAI.setMonteCarloIterations(100);
 
 		if (
 			!(

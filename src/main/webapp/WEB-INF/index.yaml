@@ -1,0 +1,22 @@
+indexes:
+- kind: Game
+  properties:
+  - name: player1ID
+  - name: lastModified
+    direction: desc
+- kind: Game
+  properties:
+  - name: player2ID
+  - name: lastModified
+    direction: desc
+- kind: Game
+  properties:
+  - name: player1ID
+  - name: player2ID
+  - name: lastModified
+    direction: desc
+- kind: GameMove
+  ancestor: yes
+  properties:
+  - name: moveNumber
+    direction: desc
