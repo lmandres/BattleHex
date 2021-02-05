@@ -70,7 +70,7 @@ public class GameManager {
 
 		} finally {
 			if (transaction.isActive()) {
-				transaction.rollback();
+				//transaction.rollback();
 			}
 		}
 
@@ -126,7 +126,7 @@ public class GameManager {
 
 		} finally {
 			if (transaction.isActive()) {
-				transaction.rollback();
+				//transaction.rollback();
 			}
 		}
 
@@ -363,7 +363,7 @@ public class GameManager {
 
 		} finally {
 			if (transaction.isActive()) {
-				transaction.rollback();
+				//transaction.rollback();
 			}
 		}
 	}
@@ -459,7 +459,7 @@ public class GameManager {
 
 		} finally {
 			if (transaction.isActive()) {
-				transaction.rollback();
+				//transaction.rollback();
 			}
 		}
 	

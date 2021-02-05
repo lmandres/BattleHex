@@ -20,3 +20,12 @@ indexes:
   properties:
   - name: moveNumber
     direction: desc
+- kind: GameMove
+  ancestor: yes
+  properties:
+  - name: moveNumber
+    direction: asc
+- kind: GameMove
+  ancestor: yes
+  properties:
+  - name: moveNumber
